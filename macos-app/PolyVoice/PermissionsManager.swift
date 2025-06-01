@@ -49,6 +49,7 @@ class PermissionsManager: ObservableObject {
     
     private var wasAccessibilityDenied = false
     private let fnKeyMonitor = FnKeyMonitor()
+    private var voiceVisualizerWindow: VoiceVisualizerWindow?
     
     init() {
         checkPermissions()
@@ -199,22 +200,55 @@ class PermissionsManager: ObservableObject {
 }
 
 extension PermissionsManager: FnKeyMonitorDelegate {
+    func fnKeyPressed() {
+        print("📢 POLYVOICE: PermissionsManager received FN PRESSED - showing voice visualizer")
+        DispatchQueue.main.async { [weak self] in
+            self?.showVoiceVisualizer()
+            print("📢 POLYVOICE: Voice visualizer shown on fn press")
+        }
+    }
+    
+    func fnKeyReleased() {
+        print("📢 POLYVOICE: PermissionsManager received FN RELEASED - hiding voice visualizer")
+        DispatchQueue.main.async { [weak self] in
+            self?.hideVoiceVisualizer()
+            print("📢 POLYVOICE: Voice visualizer hidden on fn release")
+        }
+    }
+    
     func fnKeyLongPressDetected() {
-        print("📢 POLYVOICE: PermissionsManager received LONG PRESS - posting notification")
+        print("📢 POLYVOICE: PermissionsManager received LONG PRESS")
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: .fnKeyLongPress, object: nil)
             print("📢 POLYVOICE: Long press notification posted on main thread")
         }
-        // TODO: Trigger voice recording functionality
     }
     
     func fnKeyShortPressDetected() {
-        print("📢 POLYVOICE: PermissionsManager received SHORT PRESS - posting notification")
+        print("📢 POLYVOICE: PermissionsManager received SHORT PRESS")
         DispatchQueue.main.async {
             NotificationCenter.default.post(name: .fnKeyShortPress, object: nil)
             print("📢 POLYVOICE: Short press notification posted on main thread")
         }
-        // TODO: Handle short press if needed
+    }
+    
+    // MARK: - Voice Visualizer Management
+    
+    private func showVoiceVisualizer() {
+        // Create window if it doesn't exist
+        if voiceVisualizerWindow == nil {
+            voiceVisualizerWindow = VoiceVisualizerWindow()
+            print("🎨 POLYVOICE: Created new VoiceVisualizerWindow")
+        }
+        
+        // Show the window
+        voiceVisualizerWindow?.show()
+        print("🎨 POLYVOICE: Voice visualizer window shown")
+    }
+    
+    private func hideVoiceVisualizer() {
+        voiceVisualizerWindow?.hide()
+        print("🎨 POLYVOICE: Voice visualizer window hidden")
     }
 }
 

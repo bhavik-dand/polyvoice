@@ -4,6 +4,8 @@ import AppKit
 protocol FnKeyMonitorDelegate: AnyObject {
     func fnKeyLongPressDetected()
     func fnKeyShortPressDetected()
+    func fnKeyPressed()
+    func fnKeyReleased()
 }
 
 class FnKeyMonitor: ObservableObject {
@@ -70,6 +72,9 @@ class FnKeyMonitor: ObservableObject {
         
         print("🟢 POLYVOICE: Fn key PRESSED at \(Date())")
         print("🟢 POLYVOICE: Fn press start time recorded")
+        
+        // Notify delegate immediately when pressed
+        delegate?.fnKeyPressed()
     }
     
     private func handleFnKeyReleased() {
@@ -82,6 +87,9 @@ class FnKeyMonitor: ObservableObject {
         fnPressStartTime = nil
         
         print("🔴 POLYVOICE: Fn key RELEASED after \(String(format: "%.3f", pressDuration))s")
+        
+        // Notify delegate immediately when released
+        delegate?.fnKeyReleased()
         
         if pressDuration >= longPressDuration {
             // Long press detected

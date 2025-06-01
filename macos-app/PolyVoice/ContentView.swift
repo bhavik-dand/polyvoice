@@ -6,7 +6,7 @@ struct ContentView: View {
     @State private var lastFnPressTime: String = "Never"
     
     var body: some View {
-        VStack(spacing: 20)     §§{
+        VStack(spacing: 20) {
             headerSection
             
             Divider()
