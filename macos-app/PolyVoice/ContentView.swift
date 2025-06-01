@@ -2,9 +2,11 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var permissionsManager = PermissionsManager()
+    @State private var fnKeyStatus: String = "Ready"
+    @State private var lastFnPressTime: String = "Never"
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 20)     §§{
             headerSection
             
             Divider()
@@ -14,6 +16,8 @@ struct ContentView: View {
             Divider()
             
             currentHotkeySection
+            
+            fnKeyStatusSection
             
             Spacer()
             
@@ -153,6 +157,78 @@ struct ContentView: View {
         .padding(20)
         .background(Color(.controlBackgroundColor))
         .cornerRadius(12)
+    }
+    
+    private var fnKeyStatusSection: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Fn Key Monitoring")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+            .padding(.bottom, 20)
+            
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Status:")
+                        .font(.system(size: 14))
+                    
+                    Spacer()
+                    
+                    Text(fnKeyStatus)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(fnKeyStatus == "Long Press Detected!" ? .green : .primary)
+                }
+                
+                HStack {
+                    Text("Last Press:")
+                        .font(.system(size: 14))
+                    
+                    Spacer()
+                    
+                    Text(lastFnPressTime)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                
+                if permissionsManager.accessibilityPermissionStatus != .granted {
+                    HStack {
+                        Text("⚠️ Accessibility permission required for fn key monitoring")
+                            .font(.system(size: 12))
+                            .foregroundColor(.orange)
+                        Spacer()
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .background(Color(.controlBackgroundColor))
+        .cornerRadius(12)
+        .onReceive(NotificationCenter.default.publisher(for: .fnKeyLongPress)) { _ in
+            print("🎯 POLYVOICE: ContentView received LONG PRESS notification")
+            fnKeyStatus = "Long Press Detected!"
+            lastFnPressTime = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+            print("🎯 POLYVOICE: UI updated - Status: \(fnKeyStatus), Time: \(lastFnPressTime)")
+            
+            // Reset status after 2 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                fnKeyStatus = "Ready"
+                print("🎯 POLYVOICE: Status reset to Ready")
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .fnKeyShortPress)) { _ in
+            print("🎯 POLYVOICE: ContentView received SHORT PRESS notification")
+            fnKeyStatus = "Short Press"
+            lastFnPressTime = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+            print("🎯 POLYVOICE: UI updated - Status: \(fnKeyStatus), Time: \(lastFnPressTime)")
+            
+            // Reset status after 1 second
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                fnKeyStatus = "Ready"
+                print("🎯 POLYVOICE: Status reset to Ready")
+            }
+        }
     }
     
     

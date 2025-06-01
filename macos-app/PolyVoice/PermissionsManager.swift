@@ -48,10 +48,12 @@ class PermissionsManager: ObservableObject {
     @Published var showRestartAlert: Bool = false
     
     private var wasAccessibilityDenied = false
+    private let fnKeyMonitor = FnKeyMonitor()
     
     init() {
         checkPermissions()
         setupNotifications()
+        setupFnKeyMonitor()
     }
     
     deinit {
@@ -90,6 +92,9 @@ class PermissionsManager: ObservableObject {
             
             self.accessibilityPermissionStatus = accessEnabled ? .granted : .denied
             self.wasAccessibilityDenied = !accessEnabled
+            
+            // Update fn key monitoring based on new permission status
+            self.updateFnKeyMonitoringState()
         }
     }
     
@@ -159,4 +164,61 @@ class PermissionsManager: ObservableObject {
         task.launch()
         exit(0)
     }
+    
+    private func setupFnKeyMonitor() {
+        print("🔧 POLYVOICE: Setting up FnKeyMonitor")
+        fnKeyMonitor.delegate = self
+        
+        // Start monitoring only if accessibility is granted
+        if accessibilityPermissionStatus == .granted {
+            print("🔧 POLYVOICE: Accessibility granted, starting fn key monitoring")
+            fnKeyMonitor.startMonitoring()
+        } else {
+            print("🔧 POLYVOICE: Accessibility not granted, fn key monitoring not started")
+        }
+    }
+    
+    private func updateFnKeyMonitoringState() {
+        print("🔄 POLYVOICE: Updating fn key monitoring state - accessibility: \(accessibilityPermissionStatus)")
+        if accessibilityPermissionStatus == .granted {
+            if !fnKeyMonitor.isMonitoring {
+                print("🔄 POLYVOICE: Starting fn key monitoring (was not monitoring)")
+                fnKeyMonitor.startMonitoring()
+            } else {
+                print("🔄 POLYVOICE: Fn key monitoring already active")
+            }
+        } else {
+            if fnKeyMonitor.isMonitoring {
+                print("🔄 POLYVOICE: Stopping fn key monitoring (accessibility denied)")
+                fnKeyMonitor.stopMonitoring()
+            } else {
+                print("🔄 POLYVOICE: Fn key monitoring already stopped")
+            }
+        }
+    }
+}
+
+extension PermissionsManager: FnKeyMonitorDelegate {
+    func fnKeyLongPressDetected() {
+        print("📢 POLYVOICE: PermissionsManager received LONG PRESS - posting notification")
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .fnKeyLongPress, object: nil)
+            print("📢 POLYVOICE: Long press notification posted on main thread")
+        }
+        // TODO: Trigger voice recording functionality
+    }
+    
+    func fnKeyShortPressDetected() {
+        print("📢 POLYVOICE: PermissionsManager received SHORT PRESS - posting notification")
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .fnKeyShortPress, object: nil)
+            print("📢 POLYVOICE: Short press notification posted on main thread")
+        }
+        // TODO: Handle short press if needed
+    }
+}
+
+extension Notification.Name {
+    static let fnKeyLongPress = Notification.Name("fnKeyLongPress")
+    static let fnKeyShortPress = Notification.Name("fnKeyShortPress")
 }
