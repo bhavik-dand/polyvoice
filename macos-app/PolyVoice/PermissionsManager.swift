@@ -45,11 +45,13 @@ enum PermissionStatus {
 class PermissionsManager: ObservableObject {
     @Published var microphonePermissionStatus: PermissionStatus = .notDetermined
     @Published var accessibilityPermissionStatus: PermissionStatus = .notDetermined
+    @Published var automationPermissionStatus: PermissionStatus = .notDetermined
     @Published var showRestartAlert: Bool = false
     
     private var wasAccessibilityDenied = false
     private let fnKeyMonitor = FnKeyMonitor()
     private var voiceVisualizerWindow: VoiceVisualizerWindow?
+    let audioRecorder = AudioRecorder()
     
     init() {
         checkPermissions()
@@ -65,6 +67,7 @@ class PermissionsManager: ObservableObject {
     func checkPermissions() {
         checkMicrophonePermission()
         checkAccessibilityPermission()
+        checkAutomationPermission()
     }
     
     private func checkMicrophonePermission() {
@@ -105,6 +108,37 @@ class PermissionsManager: ObservableObject {
         return AXIsProcessTrusted()
     }
     
+    func checkAutomationPermission() {
+        let hasPermission = isAutomationEnabled()
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.automationPermissionStatus = hasPermission ? .granted : .denied
+            print("🔍 POLYVOICE: Automation permission status updated: \(hasPermission ? "granted" : "denied")")
+        }
+    }
+    
+    private func isAutomationEnabled() -> Bool {
+        // Test automation permission by attempting a simple AppleScript that requires System Events access
+        let script = """
+        tell application "System Events"
+            keystroke ""
+        end tell
+        """
+        
+        var error: NSDictionary?
+        if let appleScript = NSAppleScript(source: script) {
+            appleScript.executeAndReturnError(&error)
+            if let error = error {
+                let errorCode = error["NSAppleScriptErrorNumber"] as? Int
+                print("🔍 POLYVOICE: Automation permission check error: \(error)")
+                // Error -1743 specifically means "Not authorized to send Apple events"
+                return errorCode != -1743
+            }
+            return true // No error means permission is granted
+        }
+        return false
+    }
+    
     func requestMicrophonePermission() {
         AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
             DispatchQueue.main.async {
@@ -122,8 +156,39 @@ class PermissionsManager: ObservableObject {
         }
     }
     
+    func requestAutomationPermission() {
+        // Trigger the automation permission dialog by attempting to use System Events
+        let script = """
+        tell application "System Events"
+            return true
+        end tell
+        """
+        
+        var error: NSDictionary?
+        if let appleScript = NSAppleScript(source: script) {
+            appleScript.executeAndReturnError(&error)
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                // Recheck permission status after attempt
+                self?.checkAutomationPermission()
+            }
+            
+            if error != nil {
+                // If there's still an error, open System Preferences as fallback
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.openAutomationPreferences()
+                }
+            }
+        }
+    }
+    
     private func openAccessibilityPreferences() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
+    }
+    
+    private func openAutomationPreferences() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
         NSWorkspace.shared.open(url)
     }
     
@@ -147,6 +212,11 @@ class PermissionsManager: ObservableObject {
     
     @objc private func applicationDidBecomeActive() {
         checkPermissions()
+        
+        // Also recheck automation permission specifically as it might have changed
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.checkAutomationPermission()
+        }
     }
     
     @objc private func accessibilityPermissionChanged() {
@@ -201,18 +271,20 @@ class PermissionsManager: ObservableObject {
 
 extension PermissionsManager: FnKeyMonitorDelegate {
     func fnKeyPressed() {
-        print("📢 POLYVOICE: PermissionsManager received FN PRESSED - showing voice visualizer")
+        print("📢 POLYVOICE: PermissionsManager received FN PRESSED - starting recording & showing visualizer")
         DispatchQueue.main.async { [weak self] in
             self?.showVoiceVisualizer()
-            print("📢 POLYVOICE: Voice visualizer shown on fn press")
+            self?.audioRecorder.startRecording()
+            print("📢 POLYVOICE: Voice visualizer shown & recording started")
         }
     }
     
     func fnKeyReleased() {
-        print("📢 POLYVOICE: PermissionsManager received FN RELEASED - hiding voice visualizer")
+        print("📢 POLYVOICE: PermissionsManager received FN RELEASED - stopping recording & hiding visualizer")
         DispatchQueue.main.async { [weak self] in
             self?.hideVoiceVisualizer()
-            print("📢 POLYVOICE: Voice visualizer hidden on fn release")
+            self?.audioRecorder.stopRecording()
+            print("📢 POLYVOICE: Voice visualizer hidden & recording stopped")
         }
     }
     
@@ -249,6 +321,26 @@ extension PermissionsManager: FnKeyMonitorDelegate {
     private func hideVoiceVisualizer() {
         voiceVisualizerWindow?.hide()
         print("🎨 POLYVOICE: Voice visualizer window hidden")
+    }
+    
+    // MARK: - Public Methods
+    
+    func testAutomation(text: String) {
+        let script = """
+        tell application "System Events"
+            keystroke "\(text.replacingOccurrences(of: "\"", with: "\\\""))"
+        end tell
+        """
+        
+        var error: NSDictionary?
+        if let appleScript = NSAppleScript(source: script) {
+            appleScript.executeAndReturnError(&error)
+            if let error = error {
+                print("❌ POLYVOICE: Automation test failed: \(error)")
+            } else {
+                print("✅ POLYVOICE: Automation test succeeded!")
+            }
+        }
     }
 }
 

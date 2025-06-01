@@ -4,6 +4,8 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>PolyVoice needs microphone access to convert your speech to text.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>PolyVoice needs to send keystrokes to type transcriptions at your cursor location.</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>CFBundleDisplayName</key>

@@ -19,12 +19,14 @@ struct ContentView: View {
             
             fnKeyStatusSection
             
+            transcriptionSection
+            
             Spacer()
             
             quitButton
         }
         .padding(30)
-        .frame(width: 500, height: 600)
+        .frame(width: 500, height: 650)
         .background(Color(.windowBackgroundColor))
         .alert("Restart Required", isPresented: $permissionsManager.showRestartAlert) {
             Button("Restart Now") {
@@ -231,6 +233,73 @@ struct ContentView: View {
         }
     }
     
+    private var transcriptionSection: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("Last Transcription")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Spacer()
+                
+                if permissionsManager.audioRecorder.isTranscribing {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .progressViewStyle(CircularProgressViewStyle())
+                }
+            }
+            .padding(.bottom, 20)
+            
+            VStack(spacing: 12) {
+                if permissionsManager.audioRecorder.lastTranscription.isEmpty {
+                    HStack {
+                        Text("No transcription yet")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                            .italic()
+                        Spacer()
+                    }
+                } else {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text("Result:")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            
+                            Button("Copy") {
+                                copyToClipboard(text: permissionsManager.audioRecorder.lastTranscription)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+                        }
+                        
+                        HStack {
+                            Text(permissionsManager.audioRecorder.lastTranscription)
+                                .font(.system(size: 14))
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color(.textBackgroundColor))
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color(.separatorColor), lineWidth: 1)
+                                )
+                            Spacer()
+                        }
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .background(Color(.controlBackgroundColor))
+        .cornerRadius(12)
+    }
+    
+    private func copyToClipboard(text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
     
     private var quitButton: some View {
         Button("Quit") {
