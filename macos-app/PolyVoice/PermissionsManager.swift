@@ -140,9 +140,22 @@ class PermissionsManager: ObservableObject {
     }
     
     func requestMicrophonePermission() {
+        // For AVAudioEngine, we need to trigger permission by accessing inputNode
+        // This will automatically prompt for microphone permission
+        let tempEngine = AVAudioEngine()
+        
+        // Access inputNode to trigger permission prompt
+        let _ = tempEngine.inputNode
+        
+        // Also use traditional method as backup
         AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
             DispatchQueue.main.async {
                 self?.microphonePermissionStatus = granted ? .granted : .denied
+                if granted {
+                    print("🎙️ POLYVOICE: Microphone permission granted")
+                } else {
+                    print("❌ POLYVOICE: Microphone permission denied")
+                }
             }
         }
     }
@@ -309,8 +322,8 @@ extension PermissionsManager: FnKeyMonitorDelegate {
     private func showVoiceVisualizer() {
         // Create window if it doesn't exist
         if voiceVisualizerWindow == nil {
-            voiceVisualizerWindow = VoiceVisualizerWindow()
-            print("🎨 POLYVOICE: Created new VoiceVisualizerWindow")
+            voiceVisualizerWindow = VoiceVisualizerWindow(audioRecorder: audioRecorder)
+            print("🎨 POLYVOICE: Created new VoiceVisualizerWindow with shared AudioRecorder")
         }
         
         // Show the window

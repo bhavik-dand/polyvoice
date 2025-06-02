@@ -3,14 +3,16 @@ import AppKit
 
 class VoiceVisualizerWindow: NSPanel {
     private var hostingView: NSHostingView<VoiceVisualizerView>?
+    private let audioRecorder: AudioRecorder
     
-    override init(contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
+    init(audioRecorder: AudioRecorder, contentRect: NSRect, styleMask style: NSWindow.StyleMask, backing backingStoreType: NSWindow.BackingStoreType, defer flag: Bool) {
+        self.audioRecorder = audioRecorder
         super.init(contentRect: contentRect, styleMask: [.borderless, .nonactivatingPanel], backing: backingStoreType, defer: flag)
         
         setupWindow()
     }
     
-    convenience init() {
+    convenience init(audioRecorder: AudioRecorder) {
         let windowSize = CGSize(width: 400, height: 80)
         let screenSize = NSScreen.main?.frame.size ?? CGSize(width: 1920, height: 1080)
         let windowRect = NSRect(
@@ -20,7 +22,7 @@ class VoiceVisualizerWindow: NSPanel {
             height: windowSize.height
         )
         
-        self.init(contentRect: windowRect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        self.init(audioRecorder: audioRecorder, contentRect: windowRect, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
     }
     
     private func setupWindow() {
@@ -32,15 +34,15 @@ class VoiceVisualizerWindow: NSPanel {
         self.ignoresMouseEvents = true
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         
-        // Create SwiftUI content
-        let visualizerView = VoiceVisualizerView()
+        // Create SwiftUI content with shared AudioRecorder
+        let visualizerView = VoiceVisualizerView(audioRecorder: audioRecorder)
         hostingView = NSHostingView(rootView: visualizerView)
         hostingView?.frame = self.contentView?.bounds ?? .zero
         hostingView?.autoresizingMask = [.width, .height]
         
         self.contentView = hostingView
         
-        print("🎨 POLYVOICE: VoiceVisualizerWindow created and configured")
+        print("🎨 POLYVOICE: VoiceVisualizerWindow created with shared AudioRecorder")
     }
     
     func show() {
@@ -66,7 +68,8 @@ class VoiceVisualizerWindow: NSPanel {
 
 // MARK: - SwiftUI Voice Visualizer View
 struct VoiceVisualizerView: View {
-    @StateObject private var audioMonitor = AudioLevelMonitor()
+    @ObservedObject var audioRecorder: AudioRecorder
+    @State private var audioLevels: [Float] = Array(repeating: 0.0, count: 40)
     
     var body: some View {
         ZStack {
@@ -92,25 +95,36 @@ struct VoiceVisualizerView: View {
                 .padding(.top, 8)
                 
                 // Waveform visualization
-                LinearWaveformView(audioLevels: audioMonitor.audioLevels)
+                LinearWaveformView(audioLevels: audioLevels)
                     .frame(height: 30)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onReceive(audioRecorder.$currentAudioLevel) { level in
+            updateAudioLevels(with: level)
+        }
         .onAppear {
-            audioMonitor.startMonitoring()
-            print("🎨 POLYVOICE: VoiceVisualizerView appeared, audio monitoring started")
+            print("🎨 POLYVOICE: VoiceVisualizerView appeared - using shared AudioRecorder")
         }
         .onDisappear {
-            audioMonitor.stopMonitoring()
-            print("🎨 POLYVOICE: VoiceVisualizerView disappeared, audio monitoring stopped")
+            // Reset levels when disappearing
+            audioLevels = Array(repeating: 0.0, count: 40)
+            print("🎨 POLYVOICE: VoiceVisualizerView disappeared - levels reset")
+        }
+    }
+    
+    private func updateAudioLevels(with level: Float) {
+        // Add new level to the beginning and remove the last one
+        audioLevels.insert(level, at: 0)
+        if audioLevels.count > 40 {
+            audioLevels.removeLast()
         }
     }
 }
 
 #Preview {
-    VoiceVisualizerView()
+    VoiceVisualizerView(audioRecorder: AudioRecorder())
         .frame(width: 400, height: 80)
 }

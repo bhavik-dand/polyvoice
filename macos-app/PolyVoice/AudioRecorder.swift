@@ -7,20 +7,29 @@ class AudioRecorder: NSObject, ObservableObject {
     @Published var recordingDuration: TimeInterval = 0.0
     @Published var lastTranscription: String = ""
     @Published var isTranscribing: Bool = false
+    @Published var currentAudioLevel: Float = 0.0
     
-    private var audioRecorder: AVAudioRecorder?
+    private var audioEngine = AVAudioEngine()
+    private var audioFile: AVAudioFile?
     private var recordingTimer: Timer?
     private var currentRecordingURL: URL?
     private let apiBaseURL = "http://localhost:6000"
+    private var recordingStartTime: Date?
     
     override init() {
         super.init()
         setupAudioSession()
     }
     
+    deinit {
+        cleanupRecording()
+        print("🗑️ POLYVOICE: AudioRecorder deallocated")
+    }
+    
     private func setupAudioSession() {
-        // macOS doesn't use AVAudioSession like iOS - AVAudioRecorder handles this automatically
-        print("🎙️ POLYVOICE: AudioRecorder initialized for macOS")
+        // macOS doesn't use AVAudioSession like iOS
+        // For AVAudioEngine, permission is requested when accessing inputNode
+        print("🎙️ POLYVOICE: AudioRecorder initialized for macOS with AVAudioEngine")
     }
     
     func startRecording() {
@@ -39,31 +48,51 @@ class AudioRecorder: NSObject, ObservableObject {
             return
         }
         
-        // M4A recording settings (AAC format)
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: 44100.0,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
-            AVEncoderBitRateKey: 64000 // 64 kbps - good quality for speech
-        ]
-        
         do {
-            audioRecorder = try AVAudioRecorder(url: recordingURL, settings: settings)
-            audioRecorder?.delegate = self
-            audioRecorder?.isMeteringEnabled = true
-            
-            let success = audioRecorder?.record() ?? false
-            if success {
-                isRecording = true
-                recordingDuration = 0.0
-                startTimer()
-                print("🎙️ POLYVOICE: Started recording to temporary file")
-            } else {
-                print("❌ POLYVOICE: Failed to start recording")
+            // Stop engine if it's running
+            if audioEngine.isRunning {
+                audioEngine.stop()
             }
+            
+            // Configure audio format
+            let inputNode = audioEngine.inputNode
+            let format = inputNode.outputFormat(forBus: 0)
+            
+            // Create audio file for recording
+            audioFile = try AVAudioFile(forWriting: recordingURL, settings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: 44100.0,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue,
+                AVEncoderBitRateKey: 64000
+            ])
+            
+            // Install tap on input node to capture audio and calculate levels
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+                guard let self = self, let audioFile = self.audioFile else { return }
+                
+                do {
+                    try audioFile.write(from: buffer)
+                    
+                    // Calculate audio level for visualization
+                    self.calculateAudioLevel(from: buffer)
+                } catch {
+                    print("❌ POLYVOICE: Failed to write audio buffer: \(error)")
+                }
+            }
+            
+            // Start the audio engine
+            try audioEngine.start()
+            
+            isRecording = true
+            recordingDuration = 0.0
+            recordingStartTime = Date()
+            startTimer()
+            print("🎙️ POLYVOICE: Started recording with AVAudioEngine")
+            
         } catch {
             print("❌ POLYVOICE: Recording setup failed: \(error)")
+            cleanupRecording()
         }
     }
     
@@ -73,9 +102,17 @@ class AudioRecorder: NSObject, ObservableObject {
             return
         }
         
-        audioRecorder?.stop()
+        // Advanced cleanup sequence for microphone release
+        performAdvancedCleanup()
+        
         stopTimer()
         isRecording = false
+        
+        // Reset audio level to zero
+        currentAudioLevel = 0.0
+        
+        // Close the audio file
+        audioFile = nil
         
         if let url = currentRecordingURL {
             print("✅ POLYVOICE: Recording completed, sending to transcription API")
@@ -85,14 +122,96 @@ class AudioRecorder: NSObject, ObservableObject {
         }
         
         currentRecordingURL = nil
+        print("🎙️ POLYVOICE: Audio engine stopped and microphone released")
+    }
+    
+    private func performAdvancedCleanup() {
+        // Step 1: Remove tap first (critical for resource release)
+        audioEngine.inputNode.removeTap(onBus: 0)
+        
+        // Step 2: Stop the engine
+        audioEngine.stop()
+        
+        // Step 3: Reset the engine to fully release resources
+        audioEngine.reset()
+        
+        // Step 4: Force a small delay to allow system cleanup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            // Step 5: Create a new engine instance to ensure clean state
+            self?.audioEngine = AVAudioEngine()
+            
+            // Step 6: Force system to update microphone status by briefly creating another audio object
+            self?.forceSystemMicrophoneUpdate()
+            
+            print("🔄 POLYVOICE: Audio engine reset and recreated")
+        }
+        
+        print("🧹 POLYVOICE: Advanced cleanup completed")
+    }
+    
+    private func cleanupRecording() {
+        if audioEngine.isRunning {
+            performAdvancedCleanup()
+        } else {
+            // Engine not running, just reset
+            audioEngine.reset()
+            audioEngine = AVAudioEngine()
+        }
+        audioFile = nil
+        isRecording = false
+        stopTimer()
+    }
+    
+    private func calculateAudioLevel(from buffer: AVAudioPCMBuffer) {
+        guard let channelData = buffer.floatChannelData else { return }
+        
+        let channelDataValue = channelData.pointee
+        let channelDataValueArray = stride(from: 0, to: Int(buffer.frameLength), by: buffer.stride).map { channelDataValue[$0] }
+        
+        // Calculate RMS (Root Mean Square) for audio level
+        let rms = sqrt(channelDataValueArray.map { $0 * $0 }.reduce(0, +) / Float(channelDataValueArray.count))
+        
+        // Convert to decibels and normalize
+        let decibels = 20 * log10(rms)
+        let normalizedLevel = max(0.0, min(1.0, (decibels + 80) / 80)) // Normalize -80dB to 0dB range
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.currentAudioLevel = normalizedLevel
+        }
+    }
+    
+    private func forceSystemMicrophoneUpdate() {
+        // Create a temporary AVAudioRecorder to force system microphone status update
+        // This helps clear the orange indicator on macOS
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("temp_force_update.m4a")
+        
+        let settings: [String: Any] = [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: 8000.0, // Low sample rate for minimal resource usage
+            AVNumberOfChannelsKey: 1
+        ]
+        
+        do {
+            let tempRecorder = try AVAudioRecorder(url: tempURL, settings: settings)
+            tempRecorder.record()
+            
+            // Stop immediately to signal system that microphone usage has ended
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                tempRecorder.stop()
+                try? FileManager.default.removeItem(at: tempURL)
+                print("🔄 POLYVOICE: Forced microphone status update")
+            }
+        } catch {
+            print("⚠️ POLYVOICE: Could not force microphone update: \(error)")
+        }
     }
     
     private func startTimer() {
         recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self = self, let recorder = self.audioRecorder else { return }
+            guard let self = self, let startTime = self.recordingStartTime else { return }
             
             DispatchQueue.main.async {
-                self.recordingDuration = recorder.currentTime
+                self.recordingDuration = Date().timeIntervalSince(startTime)
             }
         }
     }
@@ -105,12 +224,11 @@ class AudioRecorder: NSObject, ObservableObject {
     // MARK: - Public Methods
     
     func getCurrentAudioLevel() -> Float {
-        guard let recorder = audioRecorder, recorder.isRecording else { return 0.0 }
+        guard isRecording && audioEngine.isRunning else { return 0.0 }
         
-        recorder.updateMeters()
-        let averagePower = recorder.averagePower(forChannel: 0)
-        let normalizedLevel = pow(10, averagePower / 20) // Convert dB to linear scale
-        return min(max(normalizedLevel, 0.0), 1.0)
+        // For AVAudioEngine, we'll return a simple indicator that recording is active
+        // You could implement more sophisticated metering by analyzing the audio buffers
+        return 0.5 // Placeholder - indicates active recording
     }
     
     // MARK: - Transcription API
@@ -225,28 +343,6 @@ class AudioRecorder: NSObject, ObservableObject {
     }
 }
 
-// MARK: - AVAudioRecorderDelegate
-extension AudioRecorder: AVAudioRecorderDelegate {
-    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-        if flag {
-            print("✅ POLYVOICE: Recording finished successfully")
-        } else {
-            print("❌ POLYVOICE: Recording failed to finish properly")
-        }
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.isRecording = false
-        }
-    }
-    
-    func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
-        print("❌ POLYVOICE: Recording encode error: \(error?.localizedDescription ?? "Unknown")")
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.isRecording = false
-        }
-    }
-}
 
 // MARK: - DateFormatter Extension
 extension DateFormatter {
