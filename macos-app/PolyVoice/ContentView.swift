@@ -1,6 +1,20 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var isOnboardingComplete = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+    
+    var body: some View {
+        Group {
+            if isOnboardingComplete {
+                MainAppView()
+            } else {
+                OnboardingView(isOnboardingComplete: $isOnboardingComplete)
+            }
+        }
+    }
+}
+
+struct OriginalContentView: View {
     @StateObject private var permissionsManager = PermissionsManager()
     @State private var fnKeyStatus: String = "Ready"
     @State private var lastFnPressTime: String = "Never"
@@ -312,4 +326,8 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+}
+
+#Preview("Original") {
+    OriginalContentView()
 }

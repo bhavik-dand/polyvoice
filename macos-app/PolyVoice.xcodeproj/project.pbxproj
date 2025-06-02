@@ -12,6 +12,8 @@
 		525A4A762DECCCC500DAC465 /* LinearWaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 525A4A732DECCCC500DAC465 /* LinearWaveformView.swift */; };
 		525A4A772DECCCC500DAC465 /* AudioLevelMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 525A4A722DECCCC500DAC465 /* AudioLevelMonitor.swift */; };
 		525A4A792DECD48500DAC465 /* AudioRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 525A4A782DECD48500DAC465 /* AudioRecorder.swift */; };
+		52DFD5E72DEDBF0300AE7EF7 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52DFD5E62DEDBF0300AE7EF7 /* OnboardingView.swift */; };
+		52DFD5E82DEDBF0300AE7EF7 /* MainAppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52DFD5E52DEDBF0300AE7EF7 /* MainAppView.swift */; };
 		A1234567890123456789 /* PolyVoiceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890123456788 /* PolyVoiceApp.swift */; };
 		A1234567890123456791 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890123456790 /* ContentView.swift */; };
 		A1234567890123456793 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1234567890123456792 /* Assets.xcassets */; };
@@ -25,6 +27,8 @@
 		525A4A732DECCCC500DAC465 /* LinearWaveformView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinearWaveformView.swift; sourceTree = "<group>"; };
 		525A4A742DECCCC500DAC465 /* VoiceVisualizerWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceVisualizerWindow.swift; sourceTree = "<group>"; };
 		525A4A782DECD48500DAC465 /* AudioRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRecorder.swift; sourceTree = "<group>"; };
+		52DFD5E52DEDBF0300AE7EF7 /* MainAppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainAppView.swift; sourceTree = "<group>"; };
+		52DFD5E62DEDBF0300AE7EF7 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		A1234567890123456785 /* PolyVoice.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PolyVoice.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1234567890123456788 /* PolyVoiceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolyVoiceApp.swift; sourceTree = "<group>"; };
 		A1234567890123456790 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -64,6 +68,8 @@
 		A1234567890123456787 /* PolyVoice */ = {
 			isa = PBXGroup;
 			children = (
+				52DFD5E52DEDBF0300AE7EF7 /* MainAppView.swift */,
+				52DFD5E62DEDBF0300AE7EF7 /* OnboardingView.swift */,
 				525A4A782DECD48500DAC465 /* AudioRecorder.swift */,
 				525A4A722DECCCC500DAC465 /* AudioLevelMonitor.swift */,
 				525A4A732DECCCC500DAC465 /* LinearWaveformView.swift */,
@@ -165,6 +171,8 @@
 				525A4A762DECCCC500DAC465 /* LinearWaveformView.swift in Sources */,
 				525A4A792DECD48500DAC465 /* AudioRecorder.swift in Sources */,
 				525A4A772DECCCC500DAC465 /* AudioLevelMonitor.swift in Sources */,
+				52DFD5E72DEDBF0300AE7EF7 /* OnboardingView.swift in Sources */,
+				52DFD5E82DEDBF0300AE7EF7 /* MainAppView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
