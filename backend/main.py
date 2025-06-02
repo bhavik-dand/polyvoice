@@ -1,6 +1,6 @@
 """
 PolyVoice FastAPI Transcription Service
-A modern, versioned API for audio transcription using OpenAI's GPT models.
+A modern, versioned API for audio transcription using Groq's Whisper models.
 
 API Endpoints:
 - GET /api/v1/health - Health check with configuration status
@@ -17,15 +17,15 @@ import uvicorn
 from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from openai import OpenAI
+from groq import Groq
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# Initialize OpenAI client
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+# Initialize Groq client
+client = Groq(api_key=os.getenv('GROQ_API_KEY'))
 
 # Supported audio formats
 SUPPORTED_FORMATS = {'.m4a', '.mp3', '.wav', '.ogg', '.webm'}
@@ -36,10 +36,10 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown tasks."""
     # Startup
     print("🚀 PolyVoice Transcription API starting up...")
-    if not os.getenv('OPENAI_API_KEY'):
-        print("⚠️  WARNING: OPENAI_API_KEY not found in environment")
+    if not os.getenv('GROQ_API_KEY'):
+        print("⚠️  WARNING: GROQ_API_KEY not found in environment")
     else:
-        print("✅ OpenAI API key loaded successfully")
+        print("✅ Groq API key loaded successfully")
     
     yield
     
@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app with versioning
 app = FastAPI(
     title="PolyVoice Transcription API",
-    description="A FastAPI-based transcription service using OpenAI's GPT models",
+    description="A FastAPI-based transcription service using Groq's Whisper models",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",
@@ -72,7 +72,7 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
-    openai_configured: bool
+    groq_configured: bool
 
 
 class TranscriptionResponse(BaseModel):
@@ -98,14 +98,14 @@ async def health_check():
         status="healthy",
         service="PolyVoice Transcription API",
         version="1.0.0",
-        openai_configured=bool(os.getenv('OPENAI_API_KEY'))
+        groq_configured=bool(os.getenv('GROQ_API_KEY'))
     )
 
 
 @app.post("/api/v1/transcribe", response_model=TranscriptionResponse, tags=["API v1"])
 async def transcribe_audio_v1(audio: UploadFile = File(...)):
     """
-    Transcribe audio file to text using OpenAI's GPT-4o-mini-transcribe model.
+    Transcribe audio file to text using Groq's Whisper model.
     
     - **audio**: Audio file in M4A, MP3, WAV, OGG, or WEBM format
     - Returns transcription with metadata including processing time and cost estimates
@@ -160,13 +160,13 @@ async def transcribe_audio_v1(audio: UploadFile = File(...)):
             
             # Start transcription
             start_time = time.time()
-            print("🎯 Starting OpenAI transcription with gpt-4o-mini-transcribe...")
+            print("🎯 Starting Groq transcription with distil-whisper-large-v3-en...")
             
             with open(temp_file_path, 'rb') as audio_file_handle:
                 transcription = client.audio.transcriptions.create(
-                    file=audio_file_handle,
-                    model="gpt-4o-mini-transcribe",
-                    response_format="json"
+                    file=(audio.filename, audio_file_handle.read()),
+                    model="distil-whisper-large-v3-en",
+                    response_format="verbose_json"
                 )
             
             # Calculate processing metrics
@@ -179,7 +179,7 @@ async def transcribe_audio_v1(audio: UploadFile = File(...)):
             
             result = TranscriptionResponse(
                 text=transcription.text,
-                model_used="gpt-4o-mini-transcribe",
+                model_used="distil-whisper-large-v3-en",
                 processing_time_ms=processing_time_ms,
                 estimated_cost=round(estimated_cost, 6),
                 estimated_minutes=round(estimated_minutes, 2)

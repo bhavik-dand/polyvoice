@@ -73,7 +73,7 @@ Currently no automated tests exist. When implementing tests:
 
 Backend requires `.env` file:
 ```
-OPENAI_API_KEY=your-api-key
+GROQ_API_KEY=your-groq-api-key
 PORT=6000  # Optional, defaults to 6000
 ```
 
