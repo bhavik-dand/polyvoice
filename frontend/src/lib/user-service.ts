@@ -73,22 +73,25 @@ export class UserService {
     const users = await getUsersCollection()
     const now = new Date()
     
-    const updateData: any = {
+    const setData: any = {
       updatedAt: now,
       lastSeenAt: now,
-      [`platforms.${platform}.lastLoginAt`]: now,
-      [`platforms.${platform}.sessionCount`]: { $inc: 1 }
+      [`platforms.${platform}.lastLoginAt`]: now
+    }
+    
+    const incData: any = {
+      [`platforms.${platform}.sessionCount`]: 1
     }
     
     // Set first login if it doesn't exist
     const user = await this.findById(userId)
     if (user && !user.platforms[platform].firstLoginAt) {
-      updateData[`platforms.${platform}.firstLoginAt`] = now
+      setData[`platforms.${platform}.firstLoginAt`] = now
     }
     
     // Update macOS device info if provided
     if (platform === 'macos' && deviceInfo?.deviceId) {
-      updateData[`platforms.macos.deviceInfo`] = {
+      setData[`platforms.macos.deviceInfo`] = {
         deviceId: deviceInfo.deviceId,
         deviceName: deviceInfo.deviceName || 'Unknown Device',
         osVersion: deviceInfo.osVersion || 'Unknown'
@@ -98,8 +101,8 @@ export class UserService {
     await users.updateOne(
       { _id: userId },
       { 
-        $set: updateData,
-        $inc: { [`platforms.${platform}.sessionCount`]: 1 }
+        $set: setData,
+        $inc: incData
       }
     )
   }
