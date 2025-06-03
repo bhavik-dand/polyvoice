@@ -2,11 +2,12 @@ import SwiftUI
 
 struct OnboardingView: View {
     @StateObject private var permissionsManager = PermissionsManager()
+    @StateObject private var authManager = AuthManager.shared
     @Binding var isOnboardingComplete: Bool
     @State private var currentStep: Int = 0
     @State private var animateWelcome = false
     
-    private let totalSteps = 3
+    private let totalSteps = 4
     
     var body: some View {
         VStack(spacing: 0) {
@@ -19,8 +20,10 @@ struct OnboardingView: View {
                 case 0:
                     welcomeStep
                 case 1:
-                    microphonePermissionStep
+                    googleSignInStep
                 case 2:
+                    microphonePermissionStep
+                case 3:
                     accessibilityPermissionStep
                 default:
                     EmptyView()
@@ -68,12 +71,14 @@ struct OnboardingView: View {
                     .fontWeight(.semibold)
                 Spacer()
                 
-                Button("Skip Setup") {
-                    completeOnboarding()
+                if authManager.isAuthenticated {
+                    Button("Skip Setup") {
+                        completeOnboarding()
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.secondary)
+                    .font(.caption)
                 }
-                .buttonStyle(.plain)
-                .foregroundColor(.secondary)
-                .font(.caption)
             }
             
             ProgressView(value: Double(currentStep), total: Double(totalSteps - 1))
@@ -303,8 +308,10 @@ struct OnboardingView: View {
         case 0:
             return true
         case 1:
-            return permissionsManager.microphonePermissionStatus == .granted
+            return authManager.isAuthenticated
         case 2:
+            return permissionsManager.microphonePermissionStatus == .granted
+        case 3:
             return permissionsManager.accessibilityPermissionStatus == .granted
         default:
             return false
@@ -313,6 +320,89 @@ struct OnboardingView: View {
     
     private var isLastStep: Bool {
         currentStep == totalSteps - 1
+    }
+    
+    private var googleSignInStep: some View {
+        VStack(spacing: 32) {
+            VStack(spacing: 16) {
+                Text("🔐")
+                    .font(.system(size: 60))
+                
+                Text("Sign in with Google")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                Text("Please sign in to your Google account to continue setup")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+            
+            VStack(spacing: 20) {
+                HStack {
+                    Text("🔐")
+                        .font(.title2)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Google Authentication")
+                            .font(.headline)
+                            .fontWeight(.medium)
+                        
+                        Text("Required to access PolyVoice features")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Text(authManager.isAuthenticated ? "✅" : "⏳")
+                            .font(.title3)
+                        
+                        Text(authManager.isAuthenticated ? "Signed In" : "Required")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(authManager.isAuthenticated ? .green : .orange)
+                    }
+                }
+                
+                if authManager.isAuthenticated {
+                    VStack(spacing: 12) {
+                        HStack {
+                            Text("Welcome, \(authManager.currentUser?.name ?? "User")!")
+                                .font(.headline)
+                                .foregroundColor(.green)
+                            Spacer()
+                        }
+                        
+                        HStack {
+                            Text(authManager.currentUser?.email ?? "")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                    }
+                    .padding(.top, 8)
+                } else {
+                    Button(authManager.isLoading ? "Signing In..." : "Sign in with Google") {
+                        authManager.startAuthentication()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+                    .disabled(authManager.isLoading)
+                }
+            }
+            .padding(24)
+            .background(Color.white.opacity(0.8))
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(authManager.isAuthenticated ? Color.green.opacity(0.3) : Color.gray.opacity(0.2), lineWidth: 2)
+            )
+        }
+        .padding(.horizontal, 60)
     }
     
     private func completeOnboarding() {
