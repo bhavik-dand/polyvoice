@@ -13,7 +13,7 @@ class AudioRecorder: NSObject, ObservableObject {
     private var audioFile: AVAudioFile?
     private var recordingTimer: Timer?
     private var currentRecordingURL: URL?
-    private let apiBaseURL = "http://localhost:6000"
+    private let apiBaseURL = "http://localhost:3000"
     private var recordingStartTime: Date?
     
     override init() {

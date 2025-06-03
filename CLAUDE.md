@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PolyVoice is a macOS productivity app that enables system-wide voice-to-text. Users hold the `fn` key to record audio, which is transcribed via a FastAPI backend using OpenAI's GPT-4o-mini-transcribe model.
+PolyVoice is a macOS productivity app that enables system-wide voice-to-text. Users hold the `fn` key to record audio, which is transcribed via Next.js API routes using Groq's Whisper models.
 
 ## Architecture
 
@@ -14,38 +14,32 @@ PolyVoice is a macOS productivity app that enables system-wide voice-to-text. Us
   - `VoiceVisualizerWindow`: NSWindow subclass for visual feedback
   - Requires microphone and accessibility permissions
 
-- **Backend API** (`/backend/`): FastAPI service
-  - RESTful API at `/api/v1/`
+- **Frontend/API** (`/frontend/`): Next.js application with API routes
+  - RESTful API at `/api/v1/` using Next.js API routes
   - Supports M4A, MP3, WAV, OGG, WEBM audio formats
   - Async processing with proper error handling
-  - OpenAPI docs at `/docs`
+  - Integrated frontend and backend in single Next.js app
 
 ## Essential Commands
 
-### Backend Development
+### Frontend/API Development
 
 ```bash
-cd backend
+cd frontend
 
 # Setup
-make install        # Install dependencies
-cp .env.example .env  # Configure environment (add OPENAI_API_KEY)
+npm install        # Install dependencies
+# Add GROQ_API_KEY to .env.local
 
 # Development
-make dev           # Start dev server (hot reload on :6000)
-make docs          # Open API documentation
+npm run dev        # Start dev server (hot reload on :3000)
 
 # Production
-make prod          # Start production server
-make restart       # Restart server
-make status        # Check server status
+npm run build      # Build for production
+npm run start      # Start production server
 
 # Code Quality
-make lint          # Run flake8 (install separately)
-make format        # Run black (install separately)
-
-# Testing
-make test-api      # Basic API endpoint tests
+npm run lint       # Run ESLint
 ```
 
 ### macOS App Development
@@ -57,29 +51,29 @@ Build via Xcode:
 
 ## API Endpoints
 
-- `GET /api/v1/health` - Health check
-- `POST /api/v1/transcribe` - Audio transcription
+- `GET /api/v1/health` - Health check with Groq configuration status
+- `POST /api/v1/transcribe` - Audio transcription using Groq's Whisper model
   - Accepts multipart form data with `audio` file
-  - Returns: `{"text": "transcribed text", "duration": 0.5}`
+  - Returns: `{"text": "transcribed text", "model_used": "distil-whisper-large-v3-en", "processing_time_ms": 1500, "estimated_cost": 0.003, "estimated_minutes": 1.0}`
 
 ## Testing Approach
 
 Currently no automated tests exist. When implementing tests:
-- Python: Use pytest for backend tests
+- TypeScript: Use Jest or Vitest for API route tests
 - Swift: Use XCTest for macOS app tests
 - API: Test with curl or httpie
 
 ## Environment Configuration
 
-Backend requires `.env` file:
+Frontend requires `.env.local` file:
 ```
 GROQ_API_KEY=your-groq-api-key
-PORT=6000  # Optional, defaults to 6000
 ```
 
 ## Key Implementation Details
 
 - Audio recording uses M4A format (MPEG-4 AAC)
-- Backend handles temporary file cleanup automatically
+- Next.js API routes handle temporary file cleanup automatically
 - API uses proper HTTP status codes and error messages
+- macOS app connects to Next.js API on port 3000
 - macOS app requires entitlements for microphone and accessibility
