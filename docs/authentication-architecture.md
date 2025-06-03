@@ -1,21 +1,23 @@
 # PolyVoice Authentication Architecture
 
-**Document Version:** 1.0  
+**Document Version:** 2.0  
 **Author:** Staff Software Engineer  
 **Date:** January 2025  
-**Status:** Design Phase  
+**Status:** Implementation Phase - Revised Architecture  
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [System Requirements](#system-requirements)
-3. [Authentication Flows](#authentication-flows)
-4. [User Data Model](#user-data-model)
-5. [API Endpoints](#api-endpoints)
-6. [Token Management & Security](#token-management--security)
-7. [Implementation Roadmap](#implementation-roadmap)
-8. [Error Handling & Edge Cases](#error-handling--edge-cases)
-9. [Security Considerations](#security-considerations)
+2. [Architecture Revision - V2.0](#architecture-revision---v20)
+3. [System Requirements](#system-requirements)
+4. [Authentication Flows](#authentication-flows)
+5. [User Data Model](#user-data-model)
+6. [API Endpoints](#api-endpoints)
+7. [Token Management & Security](#token-management--security)
+8. [Implementation Roadmap](#implementation-roadmap)
+9. [Error Handling & Edge Cases](#error-handling--edge-cases)
+10. [Security Considerations](#security-considerations)
+11. [Industry Research & Best Practices](#industry-research--best-practices)
 
 ## Overview
 
@@ -24,10 +26,53 @@ PolyVoice requires a unified authentication system that serves both the web fron
 ### Key Goals
 
 - **Unified Identity**: Single user identity across web and macOS platforms
-- **Secure Authentication**: Industry-standard OAuth 2.0 implementation
-- **Seamless Experience**: Minimal friction for users across platforms
+- **Secure Authentication**: Industry-standard OAuth 2.0 implementation with web-hosted callbacks
+- **Seamless Experience**: Minimal friction for users across platforms following industry patterns
 - **State Management**: Track user journey (web signup → app download → app login)
 - **Security First**: Secure token storage and refresh mechanisms
+- **Industry Compliance**: Follow patterns used by Spotify, Discord, Slack for desktop OAuth
+
+## Architecture Revision - V2.0
+
+### **🚨 Breaking Change: Localhost to Web-Hosted Callback**
+
+Based on industry research and implementation challenges, we are revising the macOS authentication architecture from localhost HTTP server to web-hosted callback pages, following the industry standard pattern used by major applications.
+
+### **Why This Change?**
+
+**❌ Issues with V1.0 (Localhost Approach):**
+- Complex HTTP server management in macOS app
+- App instance context loss on custom URL callbacks
+- Unreliable token exchange process
+- Not following modern industry patterns
+- Security concerns with embedded HTTP servers
+
+**✅ Benefits of V2.0 (Web-Hosted Approach):**
+- **Industry Standard**: Used by Spotify, Discord, Slack, and other major desktop apps
+- **Reliable**: Leverages existing Next.js infrastructure
+- **Professional**: Branded callback experience
+- **Maintainable**: Easier to update and debug
+- **Secure**: No embedded HTTP servers or complex networking
+
+### **V2.0 Architecture Summary**
+
+```
+1. User clicks "Sign in with Google" in macOS app
+2. App opens browser → Google OAuth  
+3. Google redirects → PolyVoice Next.js app (/auth/callback/desktop)
+4. Next.js processes token exchange server-side
+5. Success page shows "Return to PolyVoice" button
+6. Button click → polyvoice://auth?token=xxx
+7. macOS app receives final token → Authentication complete
+```
+
+### **Key Changes:**
+
+1. **Google OAuth Redirect**: `localhost:9004` → `yourapp.com/auth/callback/desktop`
+2. **Token Exchange**: Moved from macOS app → Next.js backend
+3. **User Experience**: Professional callback page with branded return button
+4. **Error Handling**: Better error pages and user guidance
+5. **Maintenance**: Easier updates via web deployment
 
 ## System Requirements
 
@@ -67,7 +112,8 @@ Authorized JavaScript origins:
 ```
 Type: Desktop Application
 Authorized redirect URIs:
-  - polyvoice://auth/callback (custom URL scheme)
+  - http://localhost:3000/auth/callback/desktop (development)
+  - https://polyvoice.com/auth/callback/desktop (production)
 Bundle ID: com.polyvoice.app (for macOS app)
 ```
 
@@ -138,60 +184,72 @@ GOOGLE_CLIENT_SECRET_DESKTOP=your-desktop-client-secret
 - Create user record in MongoDB on first login
 - Grant access to download page after authentication
 
-### 2. macOS Application Flow
+### 2. macOS Application Flow (V2.0 - Web-Hosted Callback)
 
 ```
-┌──────────┐    ┌─────────┐    ┌─────────────┐    ┌─────────┐    ┌─────────┐
-│ macOS App│    │ Browser │    │ Google OAuth│    │   API   │    │ MongoDB │
-└─────┬────┘    └────┬────┘    └──────┬──────┘    └────┬────┘    └────┬────┘
-      │              │                │                │              │
-      │ 1. Generate PKCE code challenge               │              │
-      ├─────────────►│                │                │              │
-      │              │                │                │              │
-      │ 2. Open browser with OAuth URL + PKCE         │              │
-      ├─────────────►│                │                │              │
-      │              │                │                │              │
-      │              │ 3. Navigate to Google OAuth    │              │
-      │              ├───────────────►│                │              │
-      │              │                │                │              │
-      │              │ 4. Present consent screen      │              │
-      │              │◄───────────────┤                │              │
-      │              │                │                │              │
-      │              │ 5. User grants permissions     │              │
-      │              ├───────────────►│                │              │
-      │              │                │                │              │
-      │              │ 6. Redirect to polyvoice://auth/callback      │
-      │              │◄───────────────┤                │              │
-      │              │                │                │              │
-      │ 7. Launch app with auth code   │                │              │
-      │◄─────────────┤                │                │              │
-      │              │                │                │              │
-      │ 8. POST /api/v1/auth/macos (code + verifier)   │              │
-      ├──────────────────────────────────────────────►│              │
-      │              │                │                │              │
-      │              │                │ 9. Exchange code for tokens (PKCE)
-      │              │                │◄───────────────┤              │
-      │              │                │                │              │
-      │              │                │ 10. Return tokens             │
-      │              │                ├───────────────►│              │
-      │              │                │                │              │
-      │              │                │                │ 11. Find/create user
-      │              │                │                ├─────────────►│
-      │              │                │                │              │
-      │              │                │                │ 12. User data │
-      │              │                │                │◄─────────────┤
-      │              │                │                │              │
-      │ 13. Return access + refresh tokens             │              │
-      │◄──────────────────────────────────────────────┤              │
-      │              │                │                │              │
-      │ 14. Store tokens in Keychain  │                │              │
-      ├─────────────►│                │                │              │
-      │              │                │                │              │
+┌──────────┐    ┌─────────┐    ┌─────────────┐    ┌──────────────┐    ┌─────────┐    ┌─────────┐
+│ macOS App│    │ Browser │    │ Google OAuth│    │ Next.js App  │    │   API   │    │ MongoDB │
+└─────┬────┘    └────┬────┘    └──────┬──────┘    └──────┬───────┘    └────┬────┘    └────┬────┘
+      │              │                │                  │                 │              │
+      │ 1. Generate PKCE code challenge + store locally │                 │              │
+      ├─────────────►│                │                  │                 │              │
+      │              │                │                  │                 │              │
+      │ 2. Open browser with OAuth URL + PKCE           │                 │              │
+      ├─────────────►│                │                  │                 │              │
+      │              │                │                  │                 │              │
+      │              │ 3. Navigate to Google OAuth      │                 │              │
+      │              ├───────────────►│                  │                 │              │
+      │              │                │                  │                 │              │
+      │              │ 4. Present consent screen        │                 │              │
+      │              │◄───────────────┤                  │                 │              │
+      │              │                │                  │                 │              │
+      │              │ 5. User grants permissions       │                 │              │
+      │              ├───────────────►│                  │                 │              │
+      │              │                │                  │                 │              │
+      │              │ 6. Redirect to /auth/callback/desktop with code   │              │
+      │              │                │◄─────────────────┤                 │              │
+      │              │                │                  │                 │              │
+      │              │ 7. Browser navigates to callback page             │              │
+      │              ├─────────────────────────────────────────────────►│              │
+      │              │                │                  │                 │              │
+      │              │                │                  │ 8. POST /api/v1/auth/macos (code + device info)
+      │              │                │                  ├────────────────►│              │
+      │              │                │                  │                 │              │
+      │              │                │ 9. Exchange code for tokens (PKCE) │              │
+      │              │                │◄─────────────────────────────────────┤              │
+      │              │                │                  │                 │              │
+      │              │                │ 10. Return tokens                  │              │
+      │              │                ├────────────────────────────────────►│              │
+      │              │                │                  │                 │              │
+      │              │                │                  │                 │ 11. Find/create user
+      │              │                │                  │                 ├─────────────►│
+      │              │                │                  │                 │              │
+      │              │                │                  │                 │ 12. User data │
+      │              │                │                  │                 │◄─────────────┤
+      │              │                │                  │                 │              │
+      │              │                │                  │ 13. Generate app token + session │              │
+      │              │                │                  │◄─────────────────┤              │
+      │              │                │                  │                 │              │
+      │              │ 14. Show success page with "Return to PolyVoice" button  │              │
+      │              │◄─────────────────────────────────────────────────┤                 │              │
+      │              │                │                  │                 │              │
+      │              │ 15. User clicks button (polyvoice://auth?token=xxx)  │              │
+      │              ├─────────────────────────────────────────────────►│                 │              │
+      │              │                │                  │                 │              │
+      │ 16. Receive token via custom URL scheme          │                 │              │
+      │◄─────────────┤                │                  │                 │              │
+      │              │                │                  │                 │              │
+      │ 17. Store tokens in Keychain  │                  │                 │              │
+      ├─────────────►│                │                  │                 │              │
+      │              │                │                  │                 │              │
 ```
 
 **Implementation Details:**
 - Use OAuth 2.0 with PKCE (Proof Key for Code Exchange)
-- Custom URL scheme: `polyvoice://auth/callback`
+- Web-hosted callback: `/auth/callback/desktop`
+- Token exchange handled by Next.js backend
+- Custom URL scheme: `polyvoice://auth?token=xxx`
+- Professional branded success page
 - Secure token storage in macOS Keychain
 - Automatic token refresh mechanism
 
@@ -267,6 +325,59 @@ interface UserSession {
 ```
 
 ## API Endpoints
+
+### Authentication Endpoints (v1)
+
+### **New in V2.0: Desktop Callback Route**
+
+#### `GET /auth/callback/desktop`
+**Purpose**: Handle Google OAuth callback for macOS application (web-hosted)
+```typescript
+// Query Parameters (from Google)
+{
+  code: string,        // Authorization code
+  state?: string,      // CSRF protection
+  scope: string,       // Granted scopes
+  authuser?: string,   // User identifier
+  prompt?: string      // Consent type
+}
+
+// Response: HTML Page
+// Professional callback page with:
+// - Success message
+// - "Return to PolyVoice" button
+// - Error handling if OAuth failed
+// - Custom styling and branding
+```
+
+#### `POST /api/v1/auth/desktop-callback`
+**Purpose**: Process desktop OAuth callback and generate app tokens
+```typescript
+// Request (from callback page JavaScript)
+{
+  code: string,
+  state?: string,
+  deviceInfo: {
+    deviceId: string,      // From Keychain or generated
+    deviceName: string,    // Mac hostname
+    osVersion: string,     // macOS version
+    appVersion: string     // PolyVoice app version
+  }
+}
+
+// Response
+{
+  success: boolean,
+  token: string,         // JWT token for app
+  redirectUrl: string,   // polyvoice://auth?token=xxx
+  user: {
+    id: string,
+    email: string,
+    name: string,
+    avatar?: string
+  }
+}
+```
 
 ### Authentication Endpoints (v1)
 
@@ -496,29 +607,68 @@ interface JWTPayload {
 
 ## Implementation Roadmap
 
-### Phase 1: Foundation (Week 1)
-- [ ] Set up MongoDB connection and schemas
-- [ ] Install and configure NextAuth.js
-- [ ] Create basic Google OAuth configuration
-- [ ] Implement user creation and retrieval
+### Phase 1: Foundation ✅ (Completed)
+- [x] Set up MongoDB connection and schemas
+- [x] Install and configure NextAuth.js
+- [x] Create basic Google OAuth configuration
+- [x] Implement user creation and retrieval
 
-### Phase 2: Web Authentication (Week 2)
-- [ ] Complete web OAuth flow
-- [ ] Implement session management
-- [ ] Create protected download page
-- [ ] Add user profile management
+### Phase 2: Web Authentication ✅ (Completed)
+- [x] Complete web OAuth flow
+- [x] Implement session management
+- [x] Create protected download page
+- [x] Add user profile management
 
-### Phase 3: macOS Authentication (Week 3)
-- [ ] Implement PKCE flow in macOS app
-- [ ] Add custom URL scheme handling
-- [ ] Implement Keychain token storage
-- [ ] Create token refresh mechanism
+### Phase 3: macOS Authentication V1.0 ❌ (Deprecated)
+- [x] ~~Implement PKCE flow in macOS app~~
+- [x] ~~Add localhost HTTP server~~
+- [x] ~~Implement Keychain token storage~~
+- [x] ~~Create token refresh mechanism~~
+- **Issues**: Complex HTTP server, app instance context loss, unreliable
 
-### Phase 4: Integration & Testing (Week 4)
+### Phase 3: macOS Authentication V2.0 🚧 (In Progress)
+- [ ] **Create desktop callback page** (`/auth/callback/desktop`)
+- [ ] **Implement web-hosted token exchange** (`/api/v1/auth/desktop-callback`)
+- [ ] **Simplify macOS app OAuth flow** (remove HTTP server)
+- [ ] **Add custom URL handling** (`polyvoice://auth?token=xxx`)
+- [ ] **Update Google OAuth redirect URIs** (localhost → web domain)
+- [ ] **Professional callback page design** (branded success page)
+
+### Phase 4: Integration & Testing V2.0 🔜 (Next)
 - [ ] Cross-platform user state sync
 - [ ] Comprehensive error handling
 - [ ] Security testing and hardening
 - [ ] Performance optimization
+- [ ] Production deployment with HTTPS
+
+### V2.0 Migration Checklist
+
+#### Backend Changes:
+- [ ] Create `/auth/callback/desktop` page route
+- [ ] Implement `/api/v1/auth/desktop-callback` endpoint
+- [ ] Move token exchange logic from macOS app to Next.js
+- [ ] Add device info collection and storage
+- [ ] Professional callback page with branding
+
+#### macOS App Changes:
+- [ ] Remove HTTP server code (`NWListener`, connection handling)
+- [ ] Simplify OAuth flow (generate PKCE, open browser, wait for callback)
+- [ ] Update custom URL scheme handling
+- [ ] Store device info for token exchange
+- [ ] Handle tokens received via custom URL
+
+#### Google OAuth Changes:
+- [ ] Update Desktop client redirect URIs:
+  - Remove: `http://127.0.0.1:9004`
+  - Add: `http://localhost:3000/auth/callback/desktop` (dev)
+  - Add: `https://polyvoice.com/auth/callback/desktop` (prod)
+
+#### Testing & Validation:
+- [ ] Test complete OAuth flow end-to-end
+- [ ] Validate token exchange and storage
+- [ ] Verify cross-platform user linking
+- [ ] Test error scenarios and recovery
+- [ ] Performance and security validation
 
 ## Error Handling & Edge Cases
 
@@ -605,9 +755,83 @@ interface ErrorResponse {
 4. **Secure Token Storage**: Platform-appropriate storage (Keychain/httpOnly cookies)
 5. **Unified Project Management**: Centralized OAuth client management
 
+## Industry Research & Best Practices
+
+### **Major Desktop Applications OAuth Patterns (2025)**
+
+#### **Spotify Desktop App**
+- **Flow**: Desktop app → Browser → OAuth → Web callback page → "Return to App" button
+- **Redirect**: `https://accounts.spotify.com/authorize` → Web domain callback
+- **Token Exchange**: Server-side on Spotify's web infrastructure
+- **User Experience**: Professional branded callback page with clear call-to-action
+
+#### **Discord Desktop App**  
+- **Flow**: Desktop app → Browser → OAuth → Discord web callback → Custom URL launch
+- **Redirect**: OAuth redirects to Discord's web domain, not localhost
+- **Security**: PKCE implementation with web-hosted token exchange
+- **Reliability**: No embedded HTTP servers in desktop application
+
+#### **Slack Desktop App**
+- **Flow**: Similar web-hosted callback pattern
+- **Enterprise Focus**: Additional security layers for enterprise deployments
+- **Cross-Platform**: Consistent experience across desktop platforms
+
+### **Industry Security Standards (2025)**
+
+#### **OAuth 2.0 Best Practices:**
+1. **PKCE Required**: For all native applications to prevent code interception
+2. **Web-Hosted Callbacks**: Preferred over localhost for reliability and security
+3. **No Embedded WebViews**: Use system browser to prevent credential theft
+4. **Short-Lived Tokens**: Minimize exposure window for access tokens
+
+#### **Google's Updated Recommendations:**
+- **Desktop Applications**: Use web-hosted redirect URIs when possible
+- **PKCE Mandatory**: Required for enhanced security in native apps
+- **Custom URL Schemes**: Still supported but secondary to web callbacks
+- **Security Review**: Google performs enhanced security reviews for OAuth applications
+
+### **Why Major Apps Moved Away from Localhost**
+
+#### **Technical Issues:**
+- **Port Conflicts**: Multiple apps competing for the same ports
+- **Firewall Problems**: Corporate firewalls blocking localhost servers
+- **Complex Debugging**: Harder to troubleshoot networking issues
+- **Platform Differences**: Different behavior across operating systems
+
+#### **User Experience Issues:**
+- **App Instance Confusion**: New instances losing authentication context
+- **Error Messages**: Poor error handling for network failures
+- **Professional Appearance**: Localhost URLs appear unprofessional
+
+#### **Security Concerns:**
+- **Attack Surface**: Embedded HTTP servers increase security risk
+- **Certificate Issues**: HTTPS implementation complexity in desktop apps
+- **Network Exposure**: Potential for localhost server exploitation
+
+### **V2.0 Architecture Advantages**
+
+#### **Follows Industry Standards:**
+✅ **Spotify Pattern**: Web-hosted callback with branded return experience  
+✅ **Security Best Practices**: Server-side token exchange with PKCE  
+✅ **Reliability**: No embedded networking in desktop application  
+✅ **Maintainability**: Easier updates via web deployment  
+
+#### **Developer Experience:**
+✅ **Simplified Debugging**: Web-based callback easier to test and monitor  
+✅ **Better Error Handling**: Professional error pages with user guidance  
+✅ **Consistent Branding**: Unified visual experience across platforms  
+✅ **Future-Proof**: Easier to add features like 2FA, device management  
+
 ---
 
+## **V2.0 Implementation Status**
+
+**Current Status**: ✅ **Architecture Documented & Approved**  
 **Next Steps**: 
-1. **Create Google Cloud Project** with both OAuth client configurations as specified
-2. **Review architecture document** for any additional requirements
-3. **Proceed with Phase 1 implementation** upon approval
+1. **Implement desktop callback page** (`/auth/callback/desktop`)
+2. **Update Google OAuth redirect URIs** to use web domain
+3. **Simplify macOS app OAuth flow** (remove HTTP server complexity)
+4. **Test end-to-end authentication flow**
+5. **Deploy to production** with HTTPS-enabled domain
+
+**Timeline**: **1-2 days** for complete V2.0 implementation (significantly faster than V1.0 due to simplified architecture)
