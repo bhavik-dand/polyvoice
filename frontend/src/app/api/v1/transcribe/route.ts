@@ -97,7 +97,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
       const transcription = await groq.audio.transcriptions.create({
         file: new File([audioFile], audio.name, { type: audio.type }),
         model: "distil-whisper-large-v3-en",
-        response_format: "verbose_json"
+        response_format: "verbose_json",
+        prompt: "You are a helpful assistant that transcribes audio in to text. You always return the text with punctuation and capitalization wherever it is appropriate."
       })
       
       // Calculate processing metrics
