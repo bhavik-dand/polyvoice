@@ -60,12 +60,23 @@ class AuthManager: ObservableObject {
         
         // Decode JWT to get user info
         if let userInfo = decodeJWT(token) {
+            // Debug: Print all available fields in the JWT
+            print("🔍 JWT token contains these fields:")
+            for (key, value) in userInfo {
+                print("  \(key): \(value)")
+            }
+            
+            // Try to construct name from available fields
+            let name = extractNameFromJWT(userInfo)
+            
             let user = User(
                 id: userInfo["sub"] as? String ?? "",
                 email: userInfo["email"] as? String ?? "",
-                name: userInfo["name"] as? String ?? "",
-                avatar: nil
+                name: name,
+                avatar: userInfo["picture"] as? String
             )
+            
+            print("👤 Created user with name: '\(user.name)'")
             
             let appToken = AppToken(
                 token: token,
@@ -127,6 +138,28 @@ class AuthManager: ObservableObject {
     
     // MARK: - Private Methods
     
+    private func extractNameFromJWT(_ userInfo: [String: Any]) -> String {
+        // Try to get name from various fields in the JWT
+        if let name = userInfo["name"] as? String, !name.isEmpty {
+            return name
+        }
+        
+        // Try to construct name from given_name and family_name
+        let givenName = userInfo["given_name"] as? String ?? ""
+        let familyName = userInfo["family_name"] as? String ?? ""
+        
+        if !givenName.isEmpty || !familyName.isEmpty {
+            return [givenName, familyName].filter { !$0.isEmpty }.joined(separator: " ")
+        }
+        
+        // Fallback to email username if no name fields available
+        if let email = userInfo["email"] as? String {
+            return String(email.split(separator: "@").first ?? "User")
+        }
+        
+        return "User"
+    }
+    
     private func loadAuthenticationStateFromUserDefaults() {
         // Only check UserDefaults on startup - no keychain access
         isAuthenticated = UserDefaults.standard.bool(forKey: "isAuthenticated")
@@ -136,6 +169,14 @@ class AuthManager: ObservableObject {
             if let userData = UserDefaults.standard.data(forKey: "currentUser"),
                let user = try? JSONDecoder().decode(User.self, from: userData) {
                 currentUser = user
+                
+                // If user name is empty, try to refresh from keychain token
+                if user.name.isEmpty {
+                    refreshUserInfoFromToken()
+                }
+            } else {
+                // If no user data in UserDefaults, try to get it from keychain token
+                refreshUserInfoFromToken()
             }
             
             // Check if token might be expired (basic check without keychain access)
@@ -144,6 +185,23 @@ class AuthManager: ObservableObject {
                expirationDate <= Date() {
                 // Token expired, clear auth state but don't access keychain
                 clearAuthenticationState()
+            }
+        }
+    }
+    
+    private func refreshUserInfoFromToken() {
+        // Try to get user info from keychain token
+        if let appToken = retrieveAppToken() {
+            // Check if token is still valid
+            if let expirationDate = ISO8601DateFormatter().date(from: appToken.expiresAt),
+               expirationDate > Date() {
+                // Token is valid, update user info
+                currentUser = appToken.user
+                
+                // Update UserDefaults with the correct user info
+                if let userData = try? JSONEncoder().encode(appToken.user) {
+                    UserDefaults.standard.set(userData, forKey: "currentUser")
+                }
             }
         }
     }

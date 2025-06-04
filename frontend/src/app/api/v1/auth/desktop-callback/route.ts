@@ -89,6 +89,7 @@ export async function POST(request: NextRequest) {
       {
         sub: user._id!.toString(),
         email: user.email,
+        name: user.name,
         platform: 'macos',
         sessionId: session._id!.toString(),
         iat: Math.floor(Date.now() / 1000),
