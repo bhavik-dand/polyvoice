@@ -148,7 +148,7 @@ export default function DownloadPage() {
                   )}
 
                   <div className="text-sm text-slate-500 dark:text-slate-400">
-                    File size: ~15 MB • No subscription required
+                    File size: ~200 KB • No subscription required
                   </div>
                 </div>
               </div>
@@ -178,7 +178,12 @@ export default function DownloadPage() {
             </div>
 
             {/* Support */}
-            <div className="text-center">
+            <div className="text-center space-y-2">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                <a href="/install" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                  View detailed installation guide
+                </a>
+              </p>
               <p className="text-sm text-slate-600 dark:text-slate-400">
                 Need help? Contact us at{' '}
                 <a href="mailto:support@polyvoice.app" className="text-blue-600 dark:text-blue-400 hover:underline">
