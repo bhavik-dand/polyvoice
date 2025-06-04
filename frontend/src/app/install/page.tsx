@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 export default function InstallPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-900 dark:via-blue-900 dark:to-indigo-900">
@@ -13,12 +15,12 @@ export default function InstallPage() {
               </div>
               <span className="text-xl font-bold text-slate-900 dark:text-white">PolyVoice</span>
             </div>
-            <a
+            <Link
               href="/"
               className="rounded-md border border-slate-300 dark:border-slate-600 px-3 py-1 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               Back to Home
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -88,7 +90,7 @@ export default function InstallPage() {
                     </p>
                     <div className="mt-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-3">
                       <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                        <strong>First Launch:</strong> macOS may show a security warning. Click "Open" when prompted, or go to System Preferences → Security & Privacy and click "Open Anyway" if needed.
+                        <strong>First Launch:</strong> macOS may show a security warning. Click &quot;Open&quot; when prompted, or go to System Preferences → Security &amp; Privacy and click &quot;Open Anyway&quot; if needed.
                       </p>
                     </div>
                   </div>
@@ -137,7 +139,7 @@ export default function InstallPage() {
                       Start Using PolyVoice
                     </h3>
                     <p className="mt-2 text-slate-600 dark:text-slate-300">
-                      You're all set! Hold the <kbd className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-sm border">fn</kbd> key anywhere on your Mac and speak to transcribe your voice to text.
+                      You&apos;re all set! Hold the <kbd className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded text-sm border">fn</kbd> key anywhere on your Mac and speak to transcribe your voice to text.
                     </p>
                   </div>
                 </div>
