@@ -10,9 +10,7 @@ class AuthManager: ObservableObject {
     @Published var currentUser: User? = nil
     @Published var isLoading = false
     
-    private let baseURL = "http://localhost:3000"
     private let keychainService = "com.polyvoice.app"
-    private let clientId = "965938821958-bmtqtob30ulofmv9nnn35fkb2ctgtao0.apps.googleusercontent.com" // Use same client ID as web app
     
     // User model
     struct User: Codable {
@@ -30,6 +28,9 @@ class AuthManager: ObservableObject {
     }
     
     private init() {
+        // Print configuration on startup for debugging
+        AppConfig.printConfiguration()
+        
         // Use lazy loading - only check UserDefaults, no keychain access on startup
         loadAuthenticationStateFromUserDefaults()
     }
@@ -241,8 +242,8 @@ class AuthManager: ObservableObject {
     private func buildAuthURL(codeChallenge: String) -> String {
         var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
         components.queryItems = [
-            URLQueryItem(name: "client_id", value: clientId),
-            URLQueryItem(name: "redirect_uri", value: "\(baseURL)/auth/callback/desktop"),
+            URLQueryItem(name: "client_id", value: AppConfig.googleClientId),
+            URLQueryItem(name: "redirect_uri", value: AppConfig.desktopCallbackURL),
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "scope", value: "openid email profile"),
             URLQueryItem(name: "access_type", value: "offline"),
@@ -284,7 +285,7 @@ class AuthManager: ObservableObject {
     private func performLogout() async {
         if let appToken = retrieveAppToken() {
             do {
-                var request = URLRequest(url: URL(string: "\(baseURL)/api/v1/auth/logout")!)
+                var request = URLRequest(url: URL(string: AppConfig.logoutURL)!)
                 request.httpMethod = "POST"
                 request.setValue("Bearer \(appToken.token)", forHTTPHeaderField: "Authorization")
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")

@@ -13,7 +13,7 @@ class AudioRecorder: NSObject, ObservableObject {
     private var audioFile: AVAudioFile?
     private var recordingTimer: Timer?
     private var currentRecordingURL: URL?
-    private let apiBaseURL = "http://localhost:3000"
+    // API configuration is now handled by AppConfig
     private var recordingStartTime: Date?
     
     override init() {
@@ -247,7 +247,7 @@ class AudioRecorder: NSObject, ObservableObject {
             return
         }
         
-        guard let url = URL(string: "\(apiBaseURL)/api/v1/transcribe") else {
+        guard let url = URL(string: AppConfig.transcribeURL) else {
             print("❌ POLYVOICE: Invalid API URL")
             isTranscribing = false
             return
