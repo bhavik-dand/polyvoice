@@ -10,7 +10,7 @@ const handler = NextAuth({
     })
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       try {
         // Only handle Google OAuth
         if (account?.provider !== 'google') {
@@ -22,7 +22,7 @@ const handler = NextAuth({
           id: user.id,
           email: user.email!,
           name: user.name!,
-          picture: user.image
+          picture: user.image || undefined
         }, 'web')
 
         return true

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { UserService } from '@/lib/user-service'
-import { ObjectId } from 'mongodb'
+// ObjectId import removed as not used
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user from database
-    const user = await UserService.findByEmail(session.user?.email!)
+    const user = await UserService.findByEmail(session.user?.email || '')
     
     if (!user) {
       return NextResponse.json(
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark app as downloaded
-    await UserService.markAppDownloaded(user._id!, version)
+    await UserService.markAppDownloaded(user._id!)
 
     return NextResponse.json({
       success: true,

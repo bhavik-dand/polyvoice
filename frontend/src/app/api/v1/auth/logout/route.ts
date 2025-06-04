@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       message: 'Successfully logged out'
     })
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.log(`❌ Logout error: ${error}`)
     
     // Handle authentication errors

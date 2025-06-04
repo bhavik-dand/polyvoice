@@ -7,7 +7,6 @@ export async function POST(request: NextRequest) {
   try {
     const { 
       code, 
-      state,
       deviceInfo 
     } = await request.json()
     

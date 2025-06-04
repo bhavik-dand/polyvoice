@@ -33,7 +33,7 @@ export class UserService {
     const users = await getUsersCollection()
     
     // Check if user already exists
-    let existingUser = await this.findByGoogleId(googleProfile.id)
+    const existingUser = await this.findByGoogleId(googleProfile.id)
     
     if (existingUser) {
       // Update platform info and return existing user
@@ -73,13 +73,13 @@ export class UserService {
     const users = await getUsersCollection()
     const now = new Date()
     
-    const setData: any = {
+    const setData: Record<string, unknown> = {
       updatedAt: now,
       lastSeenAt: now,
       [`platforms.${platform}.lastLoginAt`]: now
     }
     
-    const incData: any = {
+    const incData: Record<string, number> = {
       [`platforms.${platform}.sessionCount`]: 1
     }
     
@@ -93,8 +93,8 @@ export class UserService {
     if (platform === 'macos' && deviceInfo?.deviceId) {
       setData[`platforms.macos.deviceInfo`] = {
         deviceId: deviceInfo.deviceId,
-        deviceName: deviceInfo.deviceName || 'Unknown Device',
-        osVersion: deviceInfo.osVersion || 'Unknown'
+        deviceName: 'Unknown Device', // Not available in session deviceInfo
+        osVersion: 'Unknown' // Not available in session deviceInfo
       }
     }
     
@@ -128,7 +128,7 @@ export class UserService {
   }
   
   // Mark app as downloaded
-  static async markAppDownloaded(userId: ObjectId, version: string): Promise<void> {
+  static async markAppDownloaded(userId: ObjectId): Promise<void> {
     const users = await getUsersCollection()
     
     await users.updateOne(
@@ -241,7 +241,7 @@ export class SessionService {
   static async revokeAllUserSessions(userId: ObjectId, platform?: 'web' | 'macos'): Promise<number> {
     const sessions = await getSessionsCollection()
     
-    const filter: any = { userId, isRevoked: false }
+    const filter: Record<string, unknown> = { userId, isRevoked: false }
     if (platform) {
       filter.platform = platform
     }

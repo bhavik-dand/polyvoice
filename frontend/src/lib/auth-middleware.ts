@@ -49,7 +49,7 @@ export class RateLimitError extends Error {
 export async function validateJWTToken(token: string): Promise<AuthenticatedRequest> {
   try {
     // Verify JWT signature and expiration
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as jwt.JwtPayload
     
     if (!decoded.sub || !decoded.email || !decoded.sessionId) {
       throw new AuthenticationError(

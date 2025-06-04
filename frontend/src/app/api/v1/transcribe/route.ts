@@ -60,7 +60,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
     
     if (!audio) {
       return NextResponse.json(
-        { error: "No audio file provided" },
+        { 
+          error: {
+            code: 'NO_AUDIO_FILE',
+            message: 'No audio file provided',
+            type: 'ValidationError'
+          },
+          timestamp: new Date().toISOString()
+        },
         { status: 400 }
       )
     }
@@ -75,7 +82,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
       if (!SUPPORTED_FORMATS.has(fileExtension)) {
         return NextResponse.json(
           { 
-            error: `Unsupported audio format. Supported formats: ${Array.from(SUPPORTED_FORMATS).join(', ')}` 
+            error: {
+              code: 'UNSUPPORTED_FORMAT',
+              message: `Unsupported audio format. Supported formats: ${Array.from(SUPPORTED_FORMATS).join(', ')}`,
+              type: 'ValidationError'
+            },
+            timestamp: new Date().toISOString()
           },
           { status: 400 }
         )
@@ -92,7 +104,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
     
     if (audioData.length === 0) {
       return NextResponse.json(
-        { error: "Empty audio file" },
+        { 
+          error: {
+            code: 'EMPTY_AUDIO_FILE',
+            message: 'Empty audio file',
+            type: 'ValidationError'
+          },
+          timestamp: new Date().toISOString()
+        },
         { status: 400 }
       )
     }
@@ -160,7 +179,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
       }
     }
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.log(`❌ Transcription error: ${error}`)
     
     // Handle authentication and rate limiting errors

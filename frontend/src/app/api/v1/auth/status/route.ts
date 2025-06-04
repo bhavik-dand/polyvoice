@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { UserService } from '@/lib/user-service'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession()
     
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user details from database
-    const user = await UserService.findByEmail(session.user?.email!)
+    const user = await UserService.findByEmail(session.user?.email || '')
     
     if (!user) {
       return NextResponse.json({

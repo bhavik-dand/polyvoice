@@ -3,6 +3,7 @@
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 
 export default function DownloadPage() {
   const { data: session, status } = useSession()
@@ -69,10 +70,12 @@ export default function DownloadPage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
                 {session.user?.image && (
-                  <img 
+                  <Image 
                     src={session.user.image} 
                     alt={session.user.name || 'User'} 
                     className="h-8 w-8 rounded-full"
+                    width={32}
+                    height={32}
                   />
                 )}
                 <span className="text-sm text-slate-700 dark:text-slate-300">
@@ -100,7 +103,7 @@ export default function DownloadPage() {
                 Welcome, {session.user?.name?.split(' ')[0]}! 👋
               </h1>
               <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
-                You're all set to download PolyVoice for macOS.
+                You&apos;re all set to download PolyVoice for macOS.
               </p>
             </div>
 
