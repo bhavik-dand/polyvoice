@@ -217,6 +217,16 @@ export class SessionService {
     )
   }
   
+  // Update session access token
+  static async updateAccessToken(sessionId: ObjectId, newAccessToken: string): Promise<void> {
+    const sessions = await getSessionsCollection()
+    
+    await sessions.updateOne(
+      { _id: sessionId },
+      { $set: { accessToken: newAccessToken } }
+    )
+  }
+  
   // Revoke session
   static async revokeSession(sessionId: ObjectId): Promise<void> {
     const sessions = await getSessionsCollection()

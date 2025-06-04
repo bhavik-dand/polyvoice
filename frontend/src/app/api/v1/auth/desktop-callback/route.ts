@@ -100,6 +100,9 @@ export async function POST(request: NextRequest) {
       { algorithm: 'HS256' }
     )
 
+    // Update the session with the JWT token (for auth middleware lookup)
+    await SessionService.updateAccessToken(session._id!, appToken)
+
     return NextResponse.json({
       success: true,
       token: appToken,
