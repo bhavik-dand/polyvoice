@@ -253,6 +253,9 @@ class AudioRecorder: NSObject, ObservableObject {
             return
         }
         
+        // Capture context
+        let context = ContextManager.shared.getCurrentContext()
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         
@@ -264,7 +267,7 @@ class AudioRecorder: NSObject, ObservableObject {
         
         do {
             let audioData = try Data(contentsOf: fileURL)
-            let httpBody = createMultipartBody(boundary: boundary, audioData: audioData, filename: fileURL.lastPathComponent)
+            let httpBody = createMultipartBody(boundary: boundary, audioData: audioData, filename: fileURL.lastPathComponent, context: context)
             request.httpBody = httpBody
             
             URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
@@ -346,7 +349,7 @@ class AudioRecorder: NSObject, ObservableObject {
         }
     }
     
-    private func createMultipartBody(boundary: String, audioData: Data, filename: String) -> Data {
+    private func createMultipartBody(boundary: String, audioData: Data, filename: String, context: ContextInfo?) -> Data {
         var body = Data()
         
         // Add audio file
@@ -356,6 +359,21 @@ class AudioRecorder: NSObject, ObservableObject {
         body.append(audioData)
         body.append("\r\n".data(using: .utf8)!)
         
+        // Add context if available
+        if let context = context {
+            do {
+                let contextData = try JSONEncoder().encode(context)
+                body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Disposition: form-data; name=\"context\"\r\n".data(using: .utf8)!)
+                body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
+                body.append(contextData)
+                body.append("\r\n".data(using: .utf8)!)
+                print("📍 POLYVOICE: Context data included in request")
+            } catch {
+                print("❌ POLYVOICE: Failed to encode context: \(error)")
+            }
+        }
+        
         // End boundary
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         
@@ -363,15 +381,18 @@ class AudioRecorder: NSObject, ObservableObject {
     }
     
     private func insertTextAtCursor(text: String) {
-        // First copy text to clipboard for fallback
+        // Convert \n to actual line breaks for proper formatting
+        let formattedText = text.replacingOccurrences(of: "\\n", with: "\n")
+        
+        // Copy formatted text to clipboard
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        pasteboard.setString(formattedText, forType: .string)
         
-        // Use AppleScript to simulate typing the text
+        // Use Cmd+V to paste - this preserves formatting perfectly
         let script = """
         tell application "System Events"
-            keystroke "\(text.replacingOccurrences(of: "\"", with: "\\\""))"
+            keystroke "v" using command down
         end tell
         """
         
@@ -379,14 +400,14 @@ class AudioRecorder: NSObject, ObservableObject {
         if let appleScript = NSAppleScript(source: script) {
             appleScript.executeAndReturnError(&error)
             if let error = error {
-                print("❌ POLYVOICE: AppleScript error: \(error)")
-                print("📋 POLYVOICE: Fallback - text copied to clipboard")
+                print("❌ POLYVOICE: Cmd+V paste failed: \(error)")
+                print("📋 POLYVOICE: Text is on clipboard - manually paste with Cmd+V")
             } else {
-                print("⌨️ POLYVOICE: Text inserted at cursor location")
+                print("📋 POLYVOICE: Text pasted with perfect formatting using Cmd+V")
             }
         } else {
             print("❌ POLYVOICE: Failed to create AppleScript")
-            print("📋 POLYVOICE: Fallback - text copied to clipboard")
+            print("📋 POLYVOICE: Text is on clipboard - manually paste with Cmd+V")
         }
     }
 }

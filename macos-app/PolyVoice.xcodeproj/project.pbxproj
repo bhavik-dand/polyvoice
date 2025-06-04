@@ -16,6 +16,7 @@
 		52DFD5E82DEDBF0300AE7EF7 /* MainAppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52DFD5E52DEDBF0300AE7EF7 /* MainAppView.swift */; };
 		52DFD5F32DEFAA9400AE7EF7 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52DFD5F22DEFAA9400AE7EF7 /* AuthManager.swift */; };
 		52DFD5F92DF05C1300AE7EF7 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52DFD5F82DF05C1300AE7EF7 /* AppConfig.swift */; };
+		52E5EE492DF0C7B100C77A33 /* ContextManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52E5EE482DF0C7B100C77A33 /* ContextManager.swift */; };
 		A1234567890123456789 /* PolyVoiceApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890123456788 /* PolyVoiceApp.swift */; };
 		A1234567890123456791 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1234567890123456790 /* ContentView.swift */; };
 		A1234567890123456793 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1234567890123456792 /* Assets.xcassets */; };
@@ -33,6 +34,7 @@
 		52DFD5E62DEDBF0300AE7EF7 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		52DFD5F22DEFAA9400AE7EF7 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
 		52DFD5F82DF05C1300AE7EF7 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		52E5EE482DF0C7B100C77A33 /* ContextManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextManager.swift; sourceTree = "<group>"; };
 		A1234567890123456785 /* PolyVoice.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PolyVoice.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1234567890123456788 /* PolyVoiceApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolyVoiceApp.swift; sourceTree = "<group>"; };
 		A1234567890123456790 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -72,6 +74,7 @@
 		A1234567890123456787 /* PolyVoice */ = {
 			isa = PBXGroup;
 			children = (
+				52E5EE482DF0C7B100C77A33 /* ContextManager.swift */,
 				52DFD5F82DF05C1300AE7EF7 /* AppConfig.swift */,
 				52DFD5F22DEFAA9400AE7EF7 /* AuthManager.swift */,
 				52DFD5E52DEDBF0300AE7EF7 /* MainAppView.swift */,
@@ -171,6 +174,7 @@
 			files = (
 				A1234567890123456791 /* ContentView.swift in Sources */,
 				A1234567890123456798 /* PermissionsManager.swift in Sources */,
+				52E5EE492DF0C7B100C77A33 /* ContextManager.swift in Sources */,
 				525A4A712DECC66300DAC465 /* FnKeyMonitor.swift in Sources */,
 				A1234567890123456789 /* PolyVoiceApp.swift in Sources */,
 				525A4A752DECCCC500DAC465 /* VoiceVisualizerWindow.swift in Sources */,
