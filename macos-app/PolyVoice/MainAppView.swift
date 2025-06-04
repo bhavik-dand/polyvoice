@@ -2,7 +2,9 @@ import SwiftUI
 
 struct MainAppView: View {
     @StateObject private var permissionsManager = PermissionsManager()
+    @StateObject private var authManager = AuthManager.shared
     @State private var showingSettings = false
+    @Binding var isOnboardingComplete: Bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -47,13 +49,78 @@ struct MainAppView: View {
             
             Spacer()
             
-            Button(action: { showingSettings = true }) {
-                Image(systemName: "gear")
-                    .font(.title3)
-                    .foregroundColor(.secondary)
+            // User profile section
+            if authManager.isAuthenticated, let user = authManager.currentUser {
+                HStack(spacing: 12) {
+                    // User avatar or initial
+                    if let avatarUrl = user.avatar, !avatarUrl.isEmpty {
+                        AsyncImage(url: URL(string: avatarUrl)) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Circle()
+                                .fill(Color.blue.opacity(0.2))
+                                .overlay(
+                                    Text(String(user.name.prefix(1)).uppercased())
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.blue)
+                                )
+                        }
+                        .frame(width: 28, height: 28)
+                        .clipShape(Circle())
+                    } else {
+                        Circle()
+                            .fill(Color.blue.opacity(0.2))
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Text(String(user.name.isEmpty ? user.email.prefix(1) : user.name.prefix(1)).uppercased())
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.blue)
+                            )
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(user.name.isEmpty ? "User" : user.name)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .lineLimit(1)
+                        
+                        Text(user.email)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                    
+                    Menu {
+                        Button("Settings") {
+                            showingSettings = true
+                        }
+                        
+                        Divider()
+                        
+                        Button("Sign Out") {
+                            handleLogout()
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("User Menu")
+                }
+            } else {
+                Button(action: { showingSettings = true }) {
+                    Image(systemName: "gear")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help("Settings")
             }
-            .buttonStyle(.plain)
-            .help("Settings")
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 20)
@@ -202,6 +269,17 @@ struct MainAppView: View {
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
     }
+    
+    private func handleLogout() {
+        // Clear onboarding completion and trigger logout
+        UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+        authManager.logout()
+        
+        // Reset to onboarding flow
+        withAnimation(.easeInOut(duration: 0.5)) {
+            isOnboardingComplete = false
+        }
+    }
 }
 
 struct SettingsView: View {
@@ -304,5 +382,5 @@ struct SettingsView: View {
 }
 
 #Preview {
-    MainAppView()
+    MainAppView(isOnboardingComplete: .constant(true))
 }

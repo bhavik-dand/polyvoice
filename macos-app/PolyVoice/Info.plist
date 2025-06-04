@@ -10,5 +10,16 @@
 	<string>public.app-category.productivity</string>
 	<key>CFBundleDisplayName</key>
 	<string>PolyVoice</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.polyvoice.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>polyvoice</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

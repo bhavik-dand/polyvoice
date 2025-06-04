@@ -237,6 +237,16 @@ class AudioRecorder: NSObject, ObservableObject {
         isTranscribing = true
         print("🌐 POLYVOICE: Starting transcription for \(fileURL.lastPathComponent)")
         
+        // 🔐 Check authentication first
+        guard let token = AuthManager.shared.getCurrentToken() else {
+            print("❌ POLYVOICE: No valid authentication token available")
+            DispatchQueue.main.async {
+                self.isTranscribing = false
+                // TODO: Show authentication error to user
+            }
+            return
+        }
+        
         guard let url = URL(string: "\(apiBaseURL)/api/v1/transcribe") else {
             print("❌ POLYVOICE: Invalid API URL")
             isTranscribing = false
@@ -245,6 +255,9 @@ class AudioRecorder: NSObject, ObservableObject {
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        
+        // 🔐 Add authentication header
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -275,16 +288,51 @@ class AudioRecorder: NSObject, ObservableObject {
                 
                 do {
                     if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        // Check for successful transcription
                         if let transcriptionText = json["text"] as? String {
                             DispatchQueue.main.async {
                                 self?.lastTranscription = transcriptionText
                                 print("✅ POLYVOICE: Transcription received: \(transcriptionText)")
                                 
+                                
                                 // Insert text at cursor
                                 self?.insertTextAtCursor(text: transcriptionText)
                             }
-                        } else if let errorMessage = json["error"] as? String {
-                            print("❌ POLYVOICE: API error: \(errorMessage)")
+                        } else if let errorObj = json["error"] as? [String: Any] {
+                            // Handle structured error responses
+                            let errorCode = errorObj["code"] as? String ?? "UNKNOWN_ERROR"
+                            let errorMessage = errorObj["message"] as? String ?? "Unknown error occurred"
+                            let errorType = errorObj["type"] as? String ?? "Error"
+                            
+                            print("❌ POLYVOICE: \(errorType) (\(errorCode)): \(errorMessage)")
+                            
+                            // Handle specific error types
+                            switch errorCode {
+                            case "RATE_LIMIT_EXCEEDED":
+                                if let retryAfter = json["retryAfter"] as? Int {
+                                    print("⏰ POLYVOICE: Rate limit exceeded. Retry in \(retryAfter) seconds")
+                                }
+                                // TODO: Show rate limit notification to user
+                                
+                            case "TOKEN_EXPIRED", "SESSION_NOT_FOUND":
+                                print("🔐 POLYVOICE: Authentication expired, clearing session")
+                                DispatchQueue.main.async {
+                                    AuthManager.shared.logout()
+                                }
+                                
+                            case "MISSING_AUTHORIZATION_HEADER", "INVALID_TOKEN_FORMAT":
+                                print("🔐 POLYVOICE: Invalid authentication, clearing session")
+                                DispatchQueue.main.async {
+                                    AuthManager.shared.logout()
+                                }
+                                
+                            default:
+                                // TODO: Show generic error notification to user
+                                break
+                            }
+                        } else if let legacyError = json["error"] as? String {
+                            // Handle legacy error format
+                            print("❌ POLYVOICE: API error: \(legacyError)")
                         }
                     }
                 } catch {

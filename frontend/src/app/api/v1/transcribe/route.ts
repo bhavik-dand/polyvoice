@@ -5,6 +5,7 @@ import { join } from 'path'
 import { randomUUID } from 'crypto'
 import 'groq-sdk/shims/web'
 import Groq from 'groq-sdk'
+import { authenticateRequest, AuthenticationError, RateLimitError, createErrorResponse, getRateLimitStatus } from '@/lib/auth-middleware'
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
@@ -23,17 +24,37 @@ interface TranscriptionResponse {
   processing_time_ms: number
   estimated_cost: number
   estimated_minutes: number
+  user_id: string
+  rate_limit: {
+    remaining: number
+    reset_time: number
+    limit: number
+  }
 }
 
 interface ErrorResponse {
-  error: string
-  detail?: string
+  error: {
+    code: string
+    message: string
+    type: string
+  }
+  timestamp: string
+  retryAfter?: number
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<TranscriptionResponse | ErrorResponse>> {
   console.log("=== V1 TRANSCRIBE ENDPOINT CALLED ===")
   
   try {
+    // 🔐 AUTHENTICATION REQUIRED - All requests must be authenticated
+    console.log("🔐 Validating authentication...")
+    const authData = await authenticateRequest(request)
+    console.log(`✅ Authenticated user: ${authData.email} (${authData.userId})`)
+    
+    // Get current rate limit status
+    const rateLimitStatus = getRateLimitStatus(authData.userId)
+    console.log(`📊 Rate limit - Remaining: ${rateLimitStatus.remaining}/${rateLimitStatus.limit}`)
+    
     const formData = await request.formData()
     const audio = formData.get('audio') as File
     
@@ -109,12 +130,21 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
       console.log(`✅ Transcription completed: '${transcription.text}'`)
       console.log(`⏱️  Processing time: ${processingTimeMs}ms`)
       
+      // Get updated rate limit status after processing
+      const updatedRateLimitStatus = getRateLimitStatus(authData.userId)
+      
       const result: TranscriptionResponse = {
         text: transcription.text,
         model_used: "distil-whisper-large-v3-en",
         processing_time_ms: processingTimeMs,
         estimated_cost: Math.round(estimatedCost * 1000000) / 1000000, // Round to 6 decimal places
-        estimated_minutes: Math.round(estimatedMinutes * 100) / 100 // Round to 2 decimal places
+        estimated_minutes: Math.round(estimatedMinutes * 100) / 100, // Round to 2 decimal places
+        user_id: authData.userId,
+        rate_limit: {
+          remaining: updatedRateLimitStatus.remaining,
+          reset_time: updatedRateLimitStatus.resetTime,
+          limit: updatedRateLimitStatus.limit
+        }
       }
       
       console.log(`📤 Returning result: ${result.text.substring(0, 50)}...`)
@@ -132,10 +162,30 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
     
   } catch (error: any) {
     console.log(`❌ Transcription error: ${error}`)
+    
+    // Handle authentication and rate limiting errors
+    if (error instanceof AuthenticationError || error instanceof RateLimitError) {
+      console.log(`🚫 ${error.name}: ${error.message}`)
+      return NextResponse.json(
+        createErrorResponse(error),
+        { 
+          status: error.statusCode,
+          headers: error instanceof RateLimitError ? {
+            'Retry-After': error.retryAfter.toString()
+          } : {}
+        }
+      )
+    }
+    
+    // Handle other errors
     return NextResponse.json(
-      { 
-        error: "Transcription failed",
-        detail: error.message 
+      {
+        error: {
+          code: 'TRANSCRIPTION_FAILED',
+          message: 'Transcription processing failed',
+          type: 'TranscriptionError'
+        },
+        timestamp: new Date().toISOString()
       },
       { status: 500 }
     )

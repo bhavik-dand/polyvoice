@@ -6,7 +6,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             if isOnboardingComplete {
-                MainAppView()
+                MainAppView(isOnboardingComplete: $isOnboardingComplete)
             } else {
                 OnboardingView(isOnboardingComplete: $isOnboardingComplete)
             }
