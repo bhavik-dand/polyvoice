@@ -324,8 +324,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
       const estimatedMinutes = Math.max(fileSizeMB / 0.5, 0.1) // Rough estimate, minimum 0.1 minutes
       console.log(`📊 File size: ${fileSizeMB.toFixed(2)}MB, Estimated duration: ${estimatedMinutes.toFixed(2)} minutes`)
       
-      // Start transcription
-      const startTime = Date.now()
+      // Start overall timing
+      const overallStartTime = Date.now()
+      
+      // Start transcription timing
+      const transcriptionStartTime = Date.now()
       console.log("🎯 Starting Groq transcription with distil-whisper-large-v3-en...")
       
       const audioFile = await fs.readFile(tempFilePath)
@@ -336,21 +339,22 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
         prompt: "You are a helpful assistant that transcribes audio in to text. You always return the text with punctuation and capitalization wherever it is appropriate."
       })
       
-      // Calculate processing metrics
-      const endTime = Date.now()
-      const processingTimeMs = endTime - startTime
+      // Calculate transcription timing
+      const transcriptionEndTime = Date.now()
+      const transcriptionTimeMs = transcriptionEndTime - transcriptionStartTime
       const estimatedCost = estimatedMinutes * 0.003 // $0.003 per minute estimate
       
       console.log(`✅ Transcription completed: '${transcription.text}'`)
-      console.log(`⏱️  Processing time: ${processingTimeMs}ms`)
+      console.log(`⏱️  TRANSCRIPTION TIME: ${transcriptionTimeMs}ms`)
       
-      // Apply context-aware formatting
+      // Apply context-aware formatting with timing
+      const formattingStartTime = Date.now()
       let finalText = transcription.text
       let formattingApplied = false
       let originalText: string | undefined = undefined
       
       if (context && transcription.text) {
-        console.log('🎨 Applying context-aware formatting...')
+        console.log('🎨 Starting context-aware formatting LLM call...')
         const formattingResult = await formatTextWithContext(transcription.text, context)
         finalText = formattingResult.formattedText
         formattingApplied = formattingResult.wasFormatted
@@ -365,13 +369,23 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
         console.log('ℹ️  No context available, skipping formatting')
       }
       
+      const formattingEndTime = Date.now()
+      const formattingTimeMs = formattingEndTime - formattingStartTime
+      console.log(`⏱️  FORMATTING TIME: ${formattingTimeMs}ms`)
+      
+      // Calculate overall timing
+      const overallEndTime = Date.now()
+      const overallTimeMs = overallEndTime - overallStartTime
+      console.log(`⏱️  TOTAL PROCESSING TIME: ${overallTimeMs}ms`)
+      console.log(`📊 TIMING BREAKDOWN: Transcription=${transcriptionTimeMs}ms, Formatting=${formattingTimeMs}ms, Total=${overallTimeMs}ms`)
+      
       // Get updated rate limit status after processing
       const updatedRateLimitStatus = getRateLimitStatus(authData.userId)
       
       const result: TranscriptionResponse = {
         text: finalText,
         model_used: "distil-whisper-large-v3-en",
-        processing_time_ms: processingTimeMs,
+        processing_time_ms: overallTimeMs,
         estimated_cost: Math.round(estimatedCost * 1000000) / 1000000, // Round to 6 decimal places
         estimated_minutes: Math.round(estimatedMinutes * 100) / 100, // Round to 2 decimal places
         user_id: authData.userId,
