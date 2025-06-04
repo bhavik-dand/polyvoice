@@ -11,8 +11,8 @@ interface RateLimitData {
 const rateLimitStore = new Map<string, RateLimitData>()
 
 // Constants
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
-const RATE_LIMIT_MAX_REQUESTS = 100
+const RATE_LIMIT_WINDOW_MS = 60 * 1000 // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 10
 
 export interface AuthenticatedRequest {
   userId: string
@@ -140,7 +140,7 @@ export function checkRateLimit(userId: string): void {
   if (userLimitData.count >= RATE_LIMIT_MAX_REQUESTS) {
     const retryAfterSeconds = Math.ceil((userLimitData.resetTime - now) / 1000)
     throw new RateLimitError(
-      `Rate limit exceeded: ${RATE_LIMIT_MAX_REQUESTS} requests per hour allowed`,
+      `Rate limit exceeded: ${RATE_LIMIT_MAX_REQUESTS} requests per minute allowed`,
       429,
       'RATE_LIMIT_EXCEEDED',
       retryAfterSeconds
