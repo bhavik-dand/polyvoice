@@ -139,11 +139,27 @@ function detectAppType(context: unknown): string {
     return 'document'
   }
   
-  // Code editors
+  // Note-taking apps
+  if (bundleId.includes('obsidian') || bundleId.includes('bear') || bundleId.includes('roam') ||
+      windowTitle.includes('obsidian') || windowTitle.includes('bear')) {
+    console.log('📓 Detected: notes context')
+    return 'notes'
+  }
+  
+  // Code editors - these get basic formatting
   if (bundleId.includes('code') || bundleId.includes('cursor') || bundleId.includes('sublime') ||
-      windowTitle.includes('visual studio code') || windowTitle.includes('cursor') || windowTitle.includes('windsurf')) {
+      bundleId.includes('xcode') || bundleId.includes('intellij') || bundleId.includes('vim') ||
+      windowTitle.includes('visual studio code') || windowTitle.includes('cursor') || 
+      windowTitle.includes('windsurf') || windowTitle.includes('xcode')) {
     console.log('💻 Detected: code context')
     return 'code'
+  }
+  
+  // Terminal/command line
+  if (bundleId.includes('terminal') || bundleId.includes('iterm') || bundleId.includes('zsh') ||
+      windowTitle.includes('terminal') || windowTitle.includes('iterm') || windowTitle.includes('zsh')) {
+    console.log('⌨️ Detected: terminal context')
+    return 'terminal'
   }
   
   console.log('🌐 Detected: generic context')
@@ -190,9 +206,9 @@ Output: {"formatted_text": "Can you check the deployment status? It's been faili
 
 Output: {"formatted_text": "Our Q4 goals include:\\n\\n• Increasing revenue by twenty percent\\n• Expanding into two new markets\\n• Improving customer satisfaction scores\\n\\nWe need to focus on:\\n• Product development\\n• Marketing campaigns\\n• Customer service training"}`,
     
-    code: `Input: "This function handles user authentication by first validating the email format, then checking if the user exists in the database, and finally verifying the password hash."
+    notes: `Input: "Meeting notes from project kickoff. Key decisions made today include choosing React for the frontend, PostgreSQL for the database, and AWS for hosting. Action items are to set up the development environment, create the initial wireframes, and schedule weekly standup meetings."
 
-Output: {"formatted_text": "This function handles user authentication by:\\n\\n• First validating the email format\\n• Then checking if the user exists in the database\\n• Finally verifying the password hash"}`,
+Output: {"formatted_text": "Meeting notes from project kickoff\\n\\nKey decisions made today:\\n• React for the frontend\\n• PostgreSQL for the database\\n• AWS for hosting\\n\\nAction items:\\n• Set up the development environment\\n• Create the initial wireframes\\n• Schedule weekly standup meetings"}`,
     
     generic: `Input: "I think we should start by reviewing the current process, identifying the main bottlenecks, and then proposing solutions. We also need to consider the budget constraints and timeline requirements."
 
@@ -223,6 +239,68 @@ function validateFormatting(original: string, formatted: string): boolean {
   
   console.log(`✅ Formatting validation passed: ${(similarity * 100).toFixed(1)}% word similarity`)
   return true
+}
+
+// Determine if context needs advanced LLM formatting or basic segment formatting
+function needsAdvancedFormatting(appType: string): boolean {
+  const advancedFormattingContexts = ['email', 'chat', 'document', 'notes', 'generic']
+  const basicFormattingContexts = ['code', 'terminal']
+  
+  if (advancedFormattingContexts.includes(appType)) {
+    console.log(`✨ ${appType} context requires ADVANCED LLM formatting`)
+    return true
+  } else if (basicFormattingContexts.includes(appType)) {
+    console.log(`⚡ ${appType} context uses BASIC segment formatting`)
+    return false
+  }
+  
+  // Default to advanced for unknown contexts
+  console.log(`❓ Unknown context ${appType}, defaulting to ADVANCED formatting`)
+  return true
+}
+
+// Simple segment-based formatter (ported from JS algorithm)
+function applyBasicSegmentFormatting(text: string): string {
+  if (!text || text.trim().length === 0) return text
+  
+  console.log('⚡ Applying basic segment formatting...')
+  
+  // Clean up extra spaces
+  const cleanedText = text.replace(/\s+/g, ' ').trim()
+  
+  // Split by sentence-ending punctuation
+  const sentences = splitIntoSentences(cleanedText)
+  
+  // Join with line breaks
+  const formatted = sentences.join('\n')
+  
+  console.log(`⚡ Basic formatting: ${sentences.length} sentences, ${formatted.length} characters`)
+  return formatted
+}
+
+function splitIntoSentences(text: string): string[] {
+  // Split on sentence endings: . ! ?
+  const sentencePattern = /([.!?])\s*/g
+  
+  // Split and keep delimiters
+  const parts = text.split(sentencePattern)
+  const sentences: string[] = []
+  
+  for (let i = 0; i < parts.length; i += 2) {
+    const sentence = parts[i]
+    const punctuation = parts[i + 1] || ''
+    
+    if (sentence.trim()) {
+      sentences.push((sentence + punctuation).trim())
+    }
+  }
+  
+  // If no sentence endings found, return the whole text as one sentence
+  if (sentences.length === 0 && text.trim()) {
+    return [text.trim()]
+  }
+  
+  return sentences.filter(s => s.length > 0)
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<TranscriptionResponse | ErrorResponse>> {
@@ -347,26 +425,41 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
       console.log(`✅ Transcription completed: '${transcription.text}'`)
       console.log(`⏱️  TRANSCRIPTION TIME: ${transcriptionTimeMs}ms`)
       
-      // Apply context-aware formatting with timing
+      // Apply conditional formatting based on context
       const formattingStartTime = Date.now()
       let finalText = transcription.text
       let formattingApplied = false
       let originalText: string | undefined = undefined
       
       if (context && transcription.text) {
-        console.log('🎨 Starting context-aware formatting LLM call...')
-        const formattingResult = await formatTextWithContext(transcription.text, context)
-        finalText = formattingResult.formattedText
-        formattingApplied = formattingResult.wasFormatted
+        const appType = detectAppType(context)
         
-        if (formattingApplied) {
-          originalText = transcription.text // Keep original for debugging
-          console.log('✅ Context-aware formatting applied successfully')
+        if (needsAdvancedFormatting(appType)) {
+          // Use LLM for advanced formatting
+          console.log('🎨 Starting context-aware LLM formatting...')
+          const formattingResult = await formatTextWithContext(transcription.text, context)
+          finalText = formattingResult.formattedText
+          formattingApplied = formattingResult.wasFormatted
+          
+          if (formattingApplied) {
+            originalText = transcription.text // Keep original for debugging
+            console.log('✅ Advanced LLM formatting applied successfully')
+          } else {
+            console.log('ℹ️  LLM formatting failed, falling back to basic formatting')
+            finalText = applyBasicSegmentFormatting(transcription.text)
+            formattingApplied = true
+          }
         } else {
-          console.log('ℹ️  No formatting applied (text too short or formatting failed)')
+          // Use basic segment formatting
+          console.log('⚡ Using basic segment formatting for technical context')
+          finalText = applyBasicSegmentFormatting(transcription.text)
+          formattingApplied = true
+          console.log('✅ Basic segment formatting applied')
         }
       } else {
-        console.log('ℹ️  No context available, skipping formatting')
+        console.log('ℹ️  No context available, applying basic formatting')
+        finalText = applyBasicSegmentFormatting(transcription.text)
+        formattingApplied = true
       }
       
       const formattingEndTime = Date.now()
