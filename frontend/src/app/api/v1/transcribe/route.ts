@@ -6,6 +6,8 @@ import { randomUUID } from 'crypto'
 import 'groq-sdk/shims/web'
 import Groq from 'groq-sdk'
 import { authenticateRequest, AuthenticationError, RateLimitError, createErrorResponse, getRateLimitStatus } from '@/lib/auth-middleware'
+import { TranscriptionStrategyManager } from '@/lib/transcription-strategies'
+import { getTranscriptionConfig, getConfigInfo } from '@/lib/transcription-config'
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY
@@ -45,65 +47,7 @@ interface ErrorResponse {
 }
 
 // Context-aware formatting functions
-async function formatTextWithContext(rawText: string, context: unknown): Promise<{ formattedText: string, wasFormatted: boolean }> {
-  // Only format if text is longer than 50 words
-  const wordCount = rawText.split(' ').filter(word => word.length > 0).length
-  if (wordCount < 10) {
-    return { formattedText: rawText, wasFormatted: false }
-  }
-
-  const appType = detectAppType(context)
-  const prompt = buildFormattingPrompt(rawText, context, appType)
-  
-  try {
-    console.log(`🎨 Formatting ${wordCount} words for ${appType} context...`)
-    
-    const response = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.0, // Deterministic formatting, no creativity
-      response_format: { type: "json_object" }, // Structured output
-      max_tokens: Math.min(rawText.length * 2, 4000), // Allow for formatting expansion
-    })
-    
-    console.log("model output: ", response.choices[0]?.message?.content?.trim(), "prompt: ", prompt)
-    const rawResponse = response.choices[0]?.message?.content?.trim()
-    
-    if (!rawResponse) {
-      console.warn('⚠️ Model returned empty response, using original text')
-      return { formattedText: rawText, wasFormatted: false }
-    }
-    
-    // Parse JSON response
-    try {
-      const jsonResponse = JSON.parse(rawResponse) as { formatted_text: string }
-      
-      if (!jsonResponse.formatted_text) {
-        console.warn('⚠️ Missing formatted_text field in JSON response')
-        return { formattedText: rawText, wasFormatted: false }
-      }
-      
-      // Validate formatting didn't change meaning
-      if (validateFormatting(rawText, jsonResponse.formatted_text)) {
-        console.log('✅ Text formatting validated and applied')
-        return { formattedText: jsonResponse.formatted_text, wasFormatted: true }
-      }
-      
-      console.warn('⚠️ Formatting validation failed, using original text')
-      console.warn('📝 Original:', rawText.substring(0, 100) + '...')
-      console.warn('🔄 Formatted:', jsonResponse.formatted_text.substring(0, 100) + '...')
-      return { formattedText: rawText, wasFormatted: false }
-      
-    } catch (jsonError) {
-      console.warn('⚠️ JSON parsing failed:', jsonError)
-      console.warn('📄 Raw response:', rawResponse)
-      return { formattedText: rawText, wasFormatted: false }
-    }
-  } catch (error) {
-    console.warn('⚠️ Formatting failed, returning original text:', error)
-    return { formattedText: rawText, wasFormatted: false }
-  }
-}
+// TEMPORARILY DISABLED FORMATTING FUNCTIONS
 
 function detectAppType(context: unknown): string {
   if (!context || typeof context !== 'object' || !('activeApp' in context) || !context.activeApp || typeof context.activeApp !== 'object' || !('bundleId' in context.activeApp)) {
@@ -405,81 +349,95 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
       // Start overall timing
       const overallStartTime = Date.now()
       
+      // Initialize strategy manager and get configuration
+      const strategyManager = new TranscriptionStrategyManager()
+      const priorityOrder = getTranscriptionConfig()
+      const configInfo = getConfigInfo()
+      
+      console.log(`🎯 Using transcription mode: ${configInfo.mode}`)
+      console.log(`📋 Priority order: ${priorityOrder.join(' → ')}`)
+      console.log(`🎬 Primary model: ${configInfo.primary}, Fallbacks: ${configInfo.fallbacks.length}`)
+      
       // Start transcription timing
       const transcriptionStartTime = Date.now()
-      console.log("🎯 Starting Groq transcription with distil-whisper-large-v3-en...")
       
       const audioFile = await fs.readFile(tempFilePath)
-      const transcription = await groq.audio.transcriptions.create({
-        file: new File([audioFile], audio.name, { type: audio.type }),
-        model: "distil-whisper-large-v3-en",
-        response_format: "verbose_json",
-        prompt: "You are a helpful assistant that transcribes audio in to text. You always return the text with punctuation and capitalization wherever it is appropriate."
-      })
+      const transcriptionResult = await strategyManager.transcribeWithFallbacks(
+        new File([audioFile], audio.name, { type: audio.type }),
+        priorityOrder,
+        {
+          prompt: "You are a helpful assistant that transcribes audio in to text. You always return the text with punctuation and capitalization wherever it is appropriate.",
+          responseFormat: "verbose_json"
+        }
+      )
       
       // Calculate transcription timing
       const transcriptionEndTime = Date.now()
       const transcriptionTimeMs = transcriptionEndTime - transcriptionStartTime
-      const estimatedCost = estimatedMinutes * 0.003 // $0.003 per minute estimate
       
-      console.log(`✅ Transcription completed: '${transcription.text}'`)
+      console.log(`✅ Transcription completed with ${transcriptionResult.provider}/${transcriptionResult.model_used}: '${transcriptionResult.text}'`)
       console.log(`⏱️  TRANSCRIPTION TIME: ${transcriptionTimeMs}ms`)
+      console.log(`💰 ESTIMATED COST: $${transcriptionResult.estimatedCost.toFixed(6)}`)
       
       // Apply conditional formatting based on context
       const formattingStartTime = Date.now()
-      let finalText = transcription.text
+      let finalText = transcriptionResult.text
       let formattingApplied = false
-      let originalText: string | undefined = undefined
+      const originalText: string | undefined = undefined
       
-      if (context && transcription.text) {
+      // ===== FORMATTING TEMPORARILY DISABLED =====
+      console.log('⚠️  FORMATTING DISABLED - Using raw transcription output')
+      finalText = transcriptionResult.text
+      formattingApplied = false
+      
+      /* FORMATTING LOGIC COMMENTED OUT FOR TESTING
+      if (context && transcriptionResult.text) {
         const appType = detectAppType(context)
         
         if (needsAdvancedFormatting(appType)) {
           // Use LLM for advanced formatting
           console.log('🎨 Starting context-aware LLM formatting...')
-          const formattingResult = await formatTextWithContext(transcription.text, context)
+          const formattingResult = await formatTextWithContext(transcriptionResult.text, context)
           finalText = formattingResult.formattedText
           formattingApplied = formattingResult.wasFormatted
           
           if (formattingApplied) {
-            originalText = transcription.text // Keep original for debugging
+            originalText = transcriptionResult.text // Keep original for debugging
             console.log('✅ Advanced LLM formatting applied successfully')
           } else {
             console.log('ℹ️  LLM formatting failed, falling back to basic formatting')
-            finalText = applyBasicSegmentFormatting(transcription.text)
+            finalText = applyBasicSegmentFormatting(transcriptionResult.text)
             formattingApplied = true
           }
         } else {
           // Use basic segment formatting
           console.log('⚡ Using basic segment formatting for technical context')
-          finalText = applyBasicSegmentFormatting(transcription.text)
+          finalText = applyBasicSegmentFormatting(transcriptionResult.text)
           formattingApplied = true
           console.log('✅ Basic segment formatting applied')
         }
       } else {
         console.log('ℹ️  No context available, applying basic formatting')
-        finalText = applyBasicSegmentFormatting(transcription.text)
+        finalText = applyBasicSegmentFormatting(transcriptionResult.text)
         formattingApplied = true
       }
+      */
       
       const formattingEndTime = Date.now()
       const formattingTimeMs = formattingEndTime - formattingStartTime
-      console.log(`⏱️  FORMATTING TIME: ${formattingTimeMs}ms`)
       
       // Calculate overall timing
       const overallEndTime = Date.now()
       const overallTimeMs = overallEndTime - overallStartTime
-      console.log(`⏱️  TOTAL PROCESSING TIME: ${overallTimeMs}ms`)
-      console.log(`📊 TIMING BREAKDOWN: Transcription=${transcriptionTimeMs}ms, Formatting=${formattingTimeMs}ms, Total=${overallTimeMs}ms`)
       
       // Get updated rate limit status after processing
       const updatedRateLimitStatus = getRateLimitStatus(authData.userId)
       
       const result: TranscriptionResponse = {
         text: finalText,
-        model_used: "distil-whisper-large-v3-en",
+        model_used: transcriptionResult.model_used,
         processing_time_ms: overallTimeMs,
-        estimated_cost: Math.round(estimatedCost * 1000000) / 1000000, // Round to 6 decimal places
+        estimated_cost: Math.round(transcriptionResult.estimatedCost * 1000000) / 1000000, // Round to 6 decimal places
         estimated_minutes: Math.round(estimatedMinutes * 100) / 100, // Round to 2 decimal places
         user_id: authData.userId,
         formatting_applied: formattingApplied,
@@ -491,7 +449,19 @@ export async function POST(request: NextRequest): Promise<NextResponse<Transcrip
         }
       }
       
-      console.log(`📤 Returning result: ${result.text}...`)
+      // ===== FINAL TIMING SUMMARY =====
+      console.log(`\n🎯 ===== PROCESSING COMPLETED =====`)
+      console.log(`⏱️  TRANSCRIPTION TIME: ${transcriptionTimeMs}ms (${(transcriptionTimeMs/1000).toFixed(2)}s)`)
+      console.log(`⏱️  FORMATTING TIME: ${formattingTimeMs}ms (${(formattingTimeMs/1000).toFixed(2)}s)`)
+      console.log(`⏱️  TOTAL PROCESSING TIME: ${overallTimeMs}ms (${(overallTimeMs/1000).toFixed(2)}s)`)
+      console.log(`📊 TIMING BREAKDOWN: Transcription=${((transcriptionTimeMs/overallTimeMs)*100).toFixed(1)}%, Formatting=${((formattingTimeMs/overallTimeMs)*100).toFixed(1)}%`)
+      console.log(`🎬 MODEL USED: ${transcriptionResult.provider}/${transcriptionResult.model_used}`)
+      console.log(`💰 ESTIMATED COST: $${transcriptionResult.estimatedCost.toFixed(6)}`)
+      console.log(`📝 TEXT LENGTH: ${finalText.length} chars, ${finalText.split(' ').length} words`)
+      console.log(`🎨 FORMATTING: ${formattingApplied ? 'Applied' : 'Skipped'}`)
+      console.log(`=====================================\n`)
+      
+      console.log(`📤 Returning result: ${result.text.substring(0, 50)}...`)
       return NextResponse.json(result)
       
     } finally {
